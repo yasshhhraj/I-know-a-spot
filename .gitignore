@@ -1,0 +1,21 @@
+# Dependencies and build products (lockfiles should be committed after installation).
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+playwright-report/
+test-results/
+
+# Private configuration. Only placeholder examples belong in git.
+.env
+.env.*
+!.env.example
+*.local
+
+# Model caches, local logs, and editor/OS noise.
+.cache/
+*.log
+.DS_Store
+.idea/
+
+# Shareable .opencode/agents and .opencode/skills are intentionally NOT ignored.

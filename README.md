@@ -1,5 +1,20 @@
 # HackW1TouchGrass
 
+## I Know a Spot — application workspace
+
+Mobile-web pilot with a later Capacitor path. See [PRD.md](PRD.md), the
+[36-hour build plan](BUILD_SCOPE_36H.md), and [future scope](FUTURE_SCOPE.md).
+
+- [SETUP.md](SETUP.md): manual install/environment/run/check commands.
+- [frontend/](frontend/): React/TypeScript/Vite scaffold (port 5173).
+- [backend/](backend/): Node/TypeScript/Fastify scaffold (port 3001).
+- [AGENTS.md](AGENTS.md) and [WORKBOARD.md](WORKBOARD.md): bounded agent workflow.
+- `.opencode/agents/`: frontend/backend implementation agent definitions.
+
+**Scaffold only:** no completed auth, feeds, photos, AI, or native wrapping.
+Packages are declared; the user installs them. The earlier DevRelay setup below
+is preserved as historical context, not evidence that the application works.
+
 An OmniRush.ai workspace configured for DEV community article research through
 the DEV/MLH DevRelay gateway at [devrelay.com](https://devrelay.com/).
 This is separate from the company-content service at devrelay.so.
@@ -46,8 +61,8 @@ No publishing permission has been verified, and nothing was published.
 - An independent OmniRush workspace lookup recognized HackW1TouchGrass after
   the original registration command's response timed out.
 
-No application framework, provider change, global MCP configuration change,
-credential file, or scheduled background job was added.
+During that earlier DevRelay-only setup, no application framework, provider change,
+global MCP configuration change, credential file, or scheduled background job was added.
 
 ## Moving this workspace to another machine
 
