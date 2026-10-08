@@ -12,8 +12,10 @@ semantic-query/radius-reduction smoke checks working. Direct SQL radius/RLS,
 Storage, broader search authorization/revocation and browser/phone checks remain
 pending. Explored's listed activation/persistence/two-account browser checks are
 user-confirmed; direct SQL/RLS, revocation/tombstone/cascade and phone checks remain
-pending. Reporting/operator CLI is locally implemented; migration0005 and live
-private-persistence/queue/removal checks remain user-run. Read API_CONTRACT.md plus
+pending. Reporting/operator CLI's five-step activation/report/dedup/private queue/
+check workflow and explicit operator deletion with other spots unaffected are
+user-confirmed; independent SQL/Storage/every-path/failure audits remain pending.
+Read API_CONTRACT.md plus
 SUPABASE_SETUP.md, SPOT_SHARING_SETUP.md, PUBLIC_DISCOVERY_SETUP.md and
 SEMANTIC_SEARCH_SETUP.md, EXPLORED_SETUP.md and REPORTING_SETUP.md for user-run external steps. Search uses in-memory vectors;
 prepared SQL seed/cleanup is metadata-only and requires no new search migration;

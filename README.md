@@ -32,8 +32,9 @@ Mobile-web pilot with a later Capacitor path. See [PRD.md](PRD.md), the
 Connections/Public feed switch and map, saved radius/manual discovery center,
 protected photo retrieval, detail/directions and owner metadata edits/deletion are
 implemented, along with local MiniLM semantic search, explored-state API/control,
-private report submission and protected local operator CLI. Reports require user-run
-migration0005; no live reporting/persistence/removal claim yet. Both apps
+private report submission and protected local operator CLI. The user confirms the
+listed reporting activation/check workflow and operator deletion worked with
+other spots unaffected; no independent SQL/Storage audit is implied. Both apps
 typecheck/build; backend 137 tests and frontend 56 tests pass. Actual local synthetic retrieval
 found expected spots for 11/11 positive queries versus 7/11 for simple keywords;
 these are small fixture results, not pilot-corpus or live authorization evidence.
@@ -41,7 +42,7 @@ User reports live auth/sharing, owner/connection photos, deletion and unconnecte
 private-denial/Public-detail access, Public loading and saved-radius exclusion/
 reload persistence and listed semantic-query/radius-reduction smoke checks working.
 Listed explored activation/persistence/two-account checks are also user-confirmed.
-Broader direct SQL/RLS/Storage/security, revocation, reporting activation/live
+Broader direct SQL/RLS/Storage/security, revocation, full removal/failure-recovery
 checks and phone checks remain pending. Native wrapping is unimplemented. Packages
 were installed by the user. Earlier DevRelay setup below is historical context,
 not proof of application functionality.

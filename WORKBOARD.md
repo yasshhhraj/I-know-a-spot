@@ -49,8 +49,12 @@ and unexplored persist across reopen/reload/sign-in, and another eligible accoun
 has independent state. Migration activation is covered by that overall workflow
 report; no separate SQL receipts or direct RLS checks were inspected. Broader
 revocation/tombstone/cascade and phone checks remain pending. Reporting/operator
-CLI is locally implemented; migration0005/private persistence/queue/removal checks
-remain user-run. Native flows are unimplemented. See REPORTING_SETUP.md,
+CLI is implemented; the user reports all five listed activation/check steps passed
+and the operator delete command worked without affecting other spots. Migration
+activation, submission/dedup/private queue and the referenced checks are covered
+by that overall report, without separately inspected receipts. Broader direct
+SQL/Storage, every-path removal and failure-recovery audits remain pending.
+Native flows are unimplemented. See REPORTING_SETUP.md,
 EXPLORED_SETUP.md, SEMANTIC_SEARCH_SETUP.md and
 SEMANTIC_SEARCH_EVALUATION.md for actual steps/evidence and limitations.
 Local tests do not prove remote RLS or a finished pilot.
@@ -74,8 +78,9 @@ Local tests do not prove remote RLS or a finished pilot.
 | AI-SQL | Search-check seed/cleanup scripts, no embedding migration | Lead; `backend/supabase/seed_semantic_search.sql`, `cleanup_semantic_search.sql`, `SEMANTIC_SEARCH_SETUP.md` | Completed (prepared only) | 14 guarded synthetic fixtures, three existing enrolled accounts, collision/media/marker safeguards; 3 structural tests passed; no PostgreSQL execution or Storage objects |
 | AI-LIVE | Populate optional fixtures and verify real-token search, revocation/radius/phone behavior | User then lead; SEMANTIC_SEARCH_SETUP.md | Partial (user-reported smoke passed) | “How to try it” workflow, listed queries and radius reduction user-confirmed; individual SQL receipts not inspected; direct access/revocation, real-corpus threshold, target resources, phone and exact RPC/RLS boundaries pending |
 | AI-PREP | Download pinned MiniLM and plan integration; no search implementation | Lead plan/verification; backend-builder `backend/scripts/minilm-smoke.mjs` | Completed (local preparation only) | Pinned q8 weight checksum matches HF; synthetic CPU and cache-only checks pass; backend typecheck/build/86 tests pass; plan in `SEMANTIC_SEARCH_PLAN.md` |
-| SAFETY | Reports and protected operator removal | Lead contract/SQL/docs; backend-builder src/tests; frontend-builder src/tests | Completed (local only) | 137 backend/56 frontend tests and typecheck/build; private deduplicated RPC, local privileged CLI, simulated warmed-cache/tombstone route checks; migration0005 and live proof pending |
-| SAFETY-LIVE | Apply0005 and test private persistence/queue/removal boundaries | User then lead; REPORTING_SETUP.md | Pending | User applies migration, verifies dedup/ordinary-role denial, privately reviews/removes disposable target; all direct feed/detail/media/search/explored/report paths denied after tombstone |
+| SAFETY | Reports and protected operator removal | Lead contract/SQL/docs; backend-builder src/tests; frontend-builder src/tests | Completed (local; listed live smoke user-confirmed) | 137 backend/56 frontend tests and typecheck/build; user confirms all five activation/check steps and operator deletion with other spots unaffected; independent direct SQL/Storage and failure audits pending |
+| SAFETY-LIVE | Apply0005 and test private persistence/queue/removal boundaries | User then lead; REPORTING_SETUP.md | Partial (user-reported workflow passed) | Listed five-step activation/report/dedup/private queue/check workflow and explicit operator deletion user-confirmed; no individual SQL/CLI receipts or full direct access/media/failure-recovery audit inspected |
+| CAMERA-RETURN | Prevent unchanged auth refocus from resetting Add form | frontend-builder `frontend/src/authController.ts`, `frontend/tests/auth.test.ts`; lead docs/checks | In progress | User reports capture return resets to feed, picker works; synthetic repeated SIGNED_IN emits verifying/enrolled and unmounts workspace; duplicate-session regression and phone retry pending |
 | EXPLORED | Per-user self-reported explored state | Lead contract/SQL/docs; backend-builder `backend/src/`, `backend/tests/`; frontend-builder `frontend/src/`, `frontend/tests/` | Completed (local; listed live smoke user-confirmed) | 118 backend/46 frontend tests and typecheck/build pass; user confirms true/false persistence across reopen/reload/sign-in and independent account state; direct SQL/RLS and broader boundaries remain pending |
 | EXPLORED-LIVE | Apply migration0004 and verify persistence, isolation and removal boundaries | User then lead; EXPLORED_SETUP.md | Partial (user-reported quick checks passed) | Listed activation/browser persistence/two-account checks confirmed; no independent SQL receipts, direct table/RPC audit, revocation/tombstone/cascade or phone proof |
 | PILOT | Combined mobile/outdoor test and submission evidence | Lead | Pending | Document actual checks, real outing, limits, and a draft; no unrequested publication |
@@ -420,6 +425,22 @@ Local tests do not prove remote RLS or a finished pilot.
   remove a disposable target and verify all ordinary routes/direct Storage/RLS.
   REPORTING_SETUP.md contains steps and bounded rollback SQL; phone/outdoor and
   broader authorization/cleanup/revocation audits still prevent pilot readiness.
+
+### User-run reporting/operator smoke update
+
+- User reports: "i performed all 5 steps and executed delete spot command all works
+  as expected no effect on other spots".
+- Record the previous final response's five-step activation/submission/dedup/private
+  queue/check workflow and explicit operator deletion as user-confirmed live smoke.
+  Other spots remain unaffected in their test. No private IDs or raw output retained.
+- Migration activation and referenced queue-denial/removal checks are within the
+  overall report; no separate SQL/CLI receipts, full direct-token/Storage matrix,
+  rollback boundary script, controlled cleanup failure or phone checks inspected.
+  Do not infer physical Storage erasure or independent security-audit completion.
+- Documentation-only update; no application code or new test run. Last executed
+  checks remain137 backend/56 frontend with typecheck/build and MiniLM regression.
+- Next: remaining direct audience/revocation/RLS/Storage/removal boundaries and
+  reachable phone/browser/outdoor pilot checks; do not expand feature scope.
 
 ### Template for the next slice
 

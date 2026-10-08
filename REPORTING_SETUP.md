@@ -23,6 +23,16 @@ Plan: [REPORTING_PLAN.md](REPORTING_PLAN.md). No moderator dashboard/HTTP API.
   real persistence, Storage erasure, browser form layout or phone behavior.
   No migration or live operator removal has been run by the assistant.
 
+## User-reported live smoke evidence
+
+The user reports completing all five activation/check steps from the implementation
+handoff and explicitly running the operator delete command: all worked as expected,
+with no effect on other spots. This covers the listed migration/restart/report/
+same-reason dedup/private queue/check workflow as an overall user report; separate
+SQL/CLI receipts and individual direct-route/Storage checks were not inspected.
+This is live smoke evidence, not an independent RLS/Storage audit, physical-media
+erasure proof, controlled cleanup-failure test or phone/outdoor validation.
+
 ## 1. Apply migration0005 once
 
 Prerequisites: earlier0001–0004 migrations and existing working spot visibility/

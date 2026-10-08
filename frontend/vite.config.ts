@@ -12,8 +12,21 @@ export default defineConfig({
       treeshake: false,
     },
   },
+  // server: {
+  //   port: 5173,
+  //   strictPort: true,
+  // },
   server: {
-    port: 5173,
-    strictPort: true,
+  host: '127.0.0.1',
+  port: 5173,
+  strictPort: true,
+  allowedHosts: ['2725-2409-40f4-100b-402-3279-61d4-1291-60f4.ngrok-free.app'],
+  proxy: {
+    '/api': {
+      target: 'http://127.0.0.1:3001',
+      changeOrigin: true,
+      rewrite: (path) => path.replace(/^\/api/, ''),
+    },
   },
+},
 })
