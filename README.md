@@ -18,6 +18,8 @@ Mobile-web pilot with a later Capacitor path. See [PRD.md](PRD.md), the
   searchable-spot SQL fixtures/cleanup and user-run checks; no new search migration.
 - [SEMANTIC_SEARCH_EVALUATION.md](SEMANTIC_SEARCH_EVALUATION.md): actual local
   MiniLM/HTTP synthetic comparison against keywords, with limits.
+- [EXPLORED_SETUP.md](EXPLORED_SETUP.md): private self-reported explored state,
+  new migration0004 and user-run persistence/authorization checks.
 - [API_CONTRACT.md](API_CONTRACT.md): protected profile and spot/media API contract.
 - [frontend/](frontend/): React/TypeScript/Vite app (port 5173).
 - [backend/](backend/): Node/TypeScript/Fastify API (port 3001).
@@ -27,14 +29,16 @@ Mobile-web pilot with a later Capacitor path. See [PRD.md](PRD.md), the
 **Incomplete pilot, locally tested:** auth plus photo/pin/note/audience sharing,
 Connections/Public feed switch and map, saved radius/manual discovery center,
 protected photo retrieval, detail/directions and owner metadata edits/deletion are
-implemented, along with local MiniLM semantic search. Both apps typecheck/build;
-backend 105 tests and frontend 37 tests pass. Actual local synthetic retrieval
+implemented, along with local MiniLM semantic search and explored-state API/control.
+Explored requires user-run migration0004; no live persistence claim yet. Both apps
+typecheck/build; backend 118 tests and frontend 46 tests pass. Actual local synthetic retrieval
 found expected spots for 11/11 positive queries versus 7/11 for simple keywords;
 these are small fixture results, not pilot-corpus or live authorization evidence.
 User reports live auth/sharing, owner/connection photos, deletion and unconnected
 private-denial/Public-detail access, Public loading and saved-radius exclusion/
-reload persistence working. Direct SQL/RLS/Storage/security, live search and phone
-checks remain pending. Explored state, reporting and native wrapping are unimplemented. Packages
+reload persistence and listed semantic-query/radius-reduction smoke checks working.
+Broader direct SQL/RLS/Storage/security, explored persistence, revocation and phone
+checks remain pending. Reporting and native wrapping are unimplemented. Packages
 were installed by the user. Earlier DevRelay setup below is historical context,
 not proof of application functionality.
 

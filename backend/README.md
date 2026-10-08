@@ -6,7 +6,8 @@ Supabase user token and reads that user's pre-enrolled profile. A migration is
 provided but **has not been applied by this implementation**. Spot sharing and a
 Connections/Public feeds and saved radius update are implemented locally. Public
 requires migration 0003 and live SQL/RPC verification; local MiniLM semantic search
-is implemented. Explored state and reporting remain unimplemented. This is not a
+is implemented. Own self-reported explored state is implemented locally and needs
+user-run migration0004; reporting remains unimplemented. This is not a
 verified working pilot.
 
 ## Local setup
@@ -204,7 +205,7 @@ do **not** establish that the migration was applied or that remote RLS works.
 
 See [../SPOT_SHARING_SETUP.md](../SPOT_SHARING_SETUP.md) for the operator-run
 migration/configuration, direct API/Storage matrix and cleanup procedure. Latest
-lead checks: typecheck/build and 6 files / 105 tests pass locally; remote checks unrun.
+lead checks: typecheck/build and 8 files / 118 tests pass locally; remote checks unrun.
 
 Public setup: [../PUBLIC_DISCOVERY_SETUP.md](../PUBLIC_DISCOVERY_SETUP.md).
 Apply `202610080003_public_feed_radius.sql` once after 0002. Prepared rollback
@@ -213,6 +214,13 @@ only caller's integer publicRadiusKm 1–25, using caller JWT and existing RLS;
 no privileged read/update fallback. Public detail-by-ID remains radius-independent.
 
 ## Security boundaries
+
+Explored activation: [../EXPLORED_SETUP.md](../EXPLORED_SETUP.md). Apply
+`supabase/migrations/202610080004_spot_explorations.sql` once after0003. Own state
+uses caller JWT/publishable key and a security-invoker boolean setter, not admin
+fallback. No GPS/visit timestamps/public counts. Missing migration is503, not false.
+Local checks now pass: 8 files / 118 tests and typecheck/build; rollback-only SQL/RLS
+script is prepared but not executed. Real persistence and role boundaries remain unverified.
 
 Follow the root `PRD.md` and `BUILD_SCOPE_36H.md` for the pilot. Public discovery
 and search must enforce audience and ownership for direct

@@ -3,6 +3,7 @@ import multipart from '@fastify/multipart';
 import Fastify from 'fastify';
 import type { ServerConfig } from './config.js';
 import { createLocalEncoder } from './encoder.js';
+import { createExploredStore, type ExploredStore } from './explored.js';
 import { createProfileProvider, createProfileUpdater, type ProfileProvider, type ProfileUpdater } from './profile.js';
 import { createSearchService, SearchDeadline, SearchFailure, type SearchService } from './search.js';
 import { cleanPhoto, createSpotStore, SpotFailure, toSpot, UUID, validateSpotInput, type SpotListOptions, type SpotStore } from './spots.js';
@@ -48,10 +49,19 @@ function searchBody(raw: unknown): { query: string; options: SpotListOptions } |
   return { query, options: { feed: 'public', centerLat: lat, centerLon: lon } };
 }
 
+function exploredBody(raw: unknown): boolean | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const body = raw as Record<string, unknown>;
+  return Object.keys(body).length === 1 && Object.hasOwn(body, 'explored') && typeof body.explored === 'boolean' ? body.explored : null;
+}
+
+function exploredPath(path: string): boolean { return /^\/spots\/[^/]+\/explored$/.test(path); }
+
 export function createApp(config: ServerConfig, profileProvider: ProfileProvider =
   createProfileProvider(config.supabaseUrl, config.supabasePublishableKey), spotStore: SpotStore = createSpotStore(config),
   profileUpdater: ProfileUpdater = createProfileUpdater(config.supabaseUrl, config.supabasePublishableKey),
-  searchService: SearchService = createSearchService(createLocalEncoder(config))) {
+  searchService: SearchService = createSearchService(createLocalEncoder(config)),
+  exploredStore: ExploredStore = createExploredStore(config)) {
   // Fastify's built-in logger stays off; the response hook below emits only
   // explicitly redacted request metadata.
   const app = Fastify({ logger: false });
@@ -64,7 +74,8 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     if (request.method === 'POST' && request.url.split('?')[0] === '/spots/search') searchDeadlines.set(request, new SearchDeadline());
     // Fastify parses JSON before route handlers. Reject missing/malformed Bearer
     // credentials first even when the request body itself cannot be parsed.
-    if (request.method === 'POST' && request.url.split('?')[0] === '/spots/search' &&
+    if (((request.method === 'POST' && request.url.split('?')[0] === '/spots/search') ||
+        (request.method === 'PUT' && exploredPath(request.url.split('?')[0]))) &&
         (typeof request.headers.authorization !== 'string' ||
           !/^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.test(request.headers.authorization))) {
       reply.header('Cache-Control', 'private, no-store');
@@ -84,7 +95,7 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
   });
   app.register(cors, {
     origin: config.frontendOrigin,
-    methods: ['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type'],
   });
   app.register(multipart, { limits: { files: 1, fields: 1, parts: 2, fieldSize: 4096, fileSize: 10 * 1024 * 1024 } });
@@ -115,6 +126,12 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     return true;
   };
   app.setErrorHandler((error, request, reply) => {
+    if (exploredPath(request.url.split('?')[0])) {
+      reply.header('Cache-Control', 'private, no-store');
+      const status = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
+      return (status === 400 || status === 413 || status === 415)
+        ? sendError(reply, 400, 'BAD_REQUEST', 'Invalid explored request.') : unavailable(reply);
+    }
     if (request.url.split('?')[0] === '/spots/search') {
       reply.header('Cache-Control', 'private, no-store');
       const status = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
@@ -210,6 +227,38 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     try { const row = await spotStore.get(caller.token, request.params.id); return row && !row.removed_at ? { spot: toSpot(row) } : missing(reply); }
     catch (error) { return fail(reply, error); }
   });
+  async function explored(request: { params: { id: string }; raw: { url?: string }; headers: { authorization?: string; 'content-type'?: string; 'content-length'?: string; 'transfer-encoding'?: string }; body?: unknown },
+    reply: Parameters<typeof sendError>[0] & { header: (name: string, value: string) => unknown }, write: boolean) {
+    reply.header('Cache-Control', 'private, no-store');
+    const caller = await verified(request, reply);
+    if (!caller) return;
+    const id = request.params.id;
+    if (!idOf(id, reply)) return;
+    if ((request.raw.url ?? '').includes('?') || (!write && (request.body !== undefined || Number(request.headers['content-length'] ?? 0) > 0 || request.headers['transfer-encoding'])))
+      return sendError(reply, 400, 'BAD_REQUEST', 'Invalid explored request.');
+    if (write && !/^application\/json(?:\s*;|\s*$)/i.test(request.headers['content-type'] ?? ''))
+      return sendError(reply, 400, 'BAD_REQUEST', 'Invalid explored request.');
+    const desired = write ? exploredBody(request.body) : null;
+    if (write && desired === null) return sendError(reply, 400, 'BAD_REQUEST', 'Invalid explored request.');
+    try {
+      const before = await spotStore.get(caller.token, id);
+      if (!before || before.removed_at) return missing(reply);
+      if (!exploredStore.configured) return unavailable(reply);
+      // Always recheck after the own-row read/write, including RPC zero-row and
+      // provider failure, so a concurrent visibility revocation returns neutral 404.
+      let value: boolean | null | undefined;
+      let failure = false;
+      try { value = write ? await exploredStore.set(caller.token, caller.profile.id, id, desired!) : await exploredStore.get(caller.token, caller.profile.id, id); }
+      catch { failure = true; }
+      const after = await spotStore.get(caller.token, id);
+      if (!after || after.removed_at) return missing(reply);
+      if (value === null) return missing(reply);
+      if (failure || typeof value !== 'boolean' || (write && value !== desired)) return unavailable(reply);
+      return { exploration: { spotId: id, explored: value } };
+    } catch { return unavailable(reply); }
+  }
+  app.get<{ Params: { id: string } }>('/spots/:id/explored', async (request, reply) => explored(request, reply, false));
+  app.put<{ Params: { id: string } }>('/spots/:id/explored', { bodyLimit: 2048 }, async (request, reply) => explored(request, reply, true));
   app.get<{ Params: { id: string } }>('/spots/:id/photo', async (request, reply) => {
     reply.header('Cache-Control', 'private, no-store').header('X-Content-Type-Options', 'nosniff');
     const caller = await verified(request, reply);

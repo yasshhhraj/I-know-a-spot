@@ -5,11 +5,13 @@
 - `frontend/`: React/TypeScript/Vite + Tailwind, pilot email/password sign-in,
   session restoration/sign-out, protected profile gate, sharing form, Leaflet pin
   picker, Connections/Public feed/map switch, saved radius/manual discovery center,
-  protected photos, owner edits/deletion, semantic-search controls and directions;
+  protected photos, owner edits/deletion, semantic search, private explored control
+  and directions;
   static-buildable. The sharing workspace is lazy-loaded with a failure boundary.
 - `backend/`: Node/TypeScript/Fastify with `GET /me` verifying caller/enrollment;
   authenticated spot/detail/media and owner create/edit/delete endpoints, Public
-  caller-JWT RPC adapter, caller-scoped radius PATCH /me and local MiniLM POST search;
+  caller-JWT RPC adapter, caller-scoped radius PATCH /me, local MiniLM POST search
+  and own-state GET/PUT explored endpoints;
   `GET /health` still reports `{"status":"scaffold"}`, not service readiness.
 - Supabase migrations are prepared, never executed by the assistant. User-reported
   live auth is partial evidence; direct RLS and spot/Storage setup remain unverified.
@@ -18,8 +20,10 @@
   [PUBLIC_DISCOVERY_SETUP.md](PUBLIC_DISCOVERY_SETUP.md) for user-run steps.
 - User reports Public loading/radius persistence/exclusion working. Direct SQL/RLS
   and browser/phone checks remain pending. MiniLM search is implemented locally and
-  compared with keywords on synthetic fixtures; live search remains unverified.
-  Explored state, reporting and native app are not implemented. See
+  compared with keywords on synthetic fixtures; listed live search/radius smoke
+  checks are user-confirmed, broader authorization/phone checks remain pending.
+  Explored state is implemented locally but requires new user-run migration0004;
+  see [EXPLORED_SETUP.md](EXPLORED_SETUP.md). Reporting and native app are not implemented. See
   [SEMANTIC_SEARCH_SETUP.md](SEMANTIC_SEARCH_SETUP.md) for guarded user-run seed/
   cleanup scripts; no new search migration or embedding backfill is required.
 - `AGENTS.md`, scoped AGENTS files, `.opencode/agents/`, and `WORKBOARD.md` provide

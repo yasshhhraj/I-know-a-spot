@@ -5,8 +5,8 @@ and record actual evidence, not anticipated success. No private payloads here.
 
 ## Current state
 
-Pilot auth/sharing, Connections/Public feed/radius and MiniLM search are implemented
-with local tests: frontend 37 tests and backend 105 tests last passed; both typecheck/build. The schema/RLS
+Pilot auth/sharing, Connections/Public feed/radius, MiniLM search and explored state
+are implemented with local tests: frontend 46/backend 118 last passed; both typecheck/build. The schema/RLS
 migrations have not been applied by the assistant. The user reports that live enrolled
 sign-in shows the expected screen and an unenrolled account shows “Not enrolled.”
 The user also confirms refresh/session restoration behaves as expected.
@@ -43,8 +43,13 @@ smoke evidence, not independent SQL/RLS or media verification. The seed/cleanup
 workflow is covered by that overall report, without separately inspected SQL
 receipts. Broader direct search authorization/revocation, phone testing and actual
 pilot-corpus quality remain pending. No search migration is needed.
-Explored, reporting and native flows are unimplemented. See SEMANTIC_SEARCH_SETUP.md
-and SEMANTIC_SEARCH_EVALUATION.md for actual steps/evidence and limitations.
+The user now reports the listed Explored activation/browser checks passed: explored
+and unexplored persist across reopen/reload/sign-in, and another eligible account
+has independent state. Migration activation is covered by that overall workflow
+report; no separate SQL receipts or direct RLS checks were inspected. Broader
+revocation/tombstone/cascade and phone checks remain pending. Reporting and native flows are
+unimplemented. See EXPLORED_SETUP.md, SEMANTIC_SEARCH_SETUP.md and
+SEMANTIC_SEARCH_EVALUATION.md for actual steps/evidence and limitations.
 Local tests do not prove remote RLS or a finished pilot.
 
 | ID | Slice | Owner / paths | State | Dependency / acceptance evidence |
@@ -67,6 +72,8 @@ Local tests do not prove remote RLS or a finished pilot.
 | AI-LIVE | Populate optional fixtures and verify real-token search, revocation/radius/phone behavior | User then lead; SEMANTIC_SEARCH_SETUP.md | Partial (user-reported smoke passed) | “How to try it” workflow, listed queries and radius reduction user-confirmed; individual SQL receipts not inspected; direct access/revocation, real-corpus threshold, target resources, phone and exact RPC/RLS boundaries pending |
 | AI-PREP | Download pinned MiniLM and plan integration; no search implementation | Lead plan/verification; backend-builder `backend/scripts/minilm-smoke.mjs` | Completed (local preparation only) | Pinned q8 weight checksum matches HF; synthetic CPU and cache-only checks pass; backend typecheck/build/86 tests pass; plan in `SEMANTIC_SEARCH_PLAN.md` |
 | SAFETY | Reports and protected operator removal | Unassigned; backend/ then frontend/ | Pending | Removed content unavailable through all ordinary access paths |
+| EXPLORED | Per-user self-reported explored state | Lead contract/SQL/docs; backend-builder `backend/src/`, `backend/tests/`; frontend-builder `frontend/src/`, `frontend/tests/` | Completed (local; listed live smoke user-confirmed) | 118 backend/46 frontend tests and typecheck/build pass; user confirms true/false persistence across reopen/reload/sign-in and independent account state; direct SQL/RLS and broader boundaries remain pending |
+| EXPLORED-LIVE | Apply migration0004 and verify persistence, isolation and removal boundaries | User then lead; EXPLORED_SETUP.md | Partial (user-reported quick checks passed) | Listed activation/browser persistence/two-account checks confirmed; no independent SQL receipts, direct table/RPC audit, revocation/tombstone/cascade or phone proof |
 | PILOT | Combined mobile/outdoor test and submission evidence | Lead | Pending | Document actual checks, real outing, limits, and a draft; no unrequested publication |
 
 ## Handoff format
@@ -317,6 +324,56 @@ Local tests do not prove remote RLS or a finished pilot.
 - No application code changed for this update; prior 105/37 test results remain
   historical passed evidence, not rerun checks. Next implementation slice is the
   required per-user self-reported explored state; reporting remains after it.
+
+### Explored implementation — October8,2026
+
+- User requested planning then implementation; both completed in the current session,
+  without claiming background/offline execution. Plan EXPLORED_PLAN.md and agreed
+  API_CONTRACT.md preceded parallel backend/frontend implementation.
+- Backend: src/explored.ts, app.ts and tests/explored.test.ts. Fresh publishable
+  caller-JWT GET/PUT own state; current spot checks before/after, radius-independent
+  Public detail access, no admin fallback, strict boolean setters/RPC results and
+  safe no-store errors. PUT CORS verified. Existing first5 createApp arguments retained.
+- Frontend: exploredApi.ts, exploredController.ts, ExploredControl.tsx, detail wiring
+  and tests. Independent self-reported control; confirmed values only, pending disable,
+ 30s GET/35s PUT, explicit reload after uncertain writes, current member/spot scope
+  rejects late success/error, auth recheck and inaccessible-detail clearing. No model
+  or feed-state changes, GPS, public counts, visit timestamps or activity export.
+- New prepared migration: backend/supabase/migrations/202610080004_spot_explorations.sql.
+  Three-column composite-key table, own/current-spot SELECT/INSERT/UPDATE policies,
+  narrow column grants and authenticated-only security-invoker RPC. True/false desired
+  sets are idempotent; concurrent clients last-committed-write-win. Physical deletion
+  cascades marks; tombstones/revocation hide them before physical cleanup.
+- Prepared backend/supabase/check_explored_boundaries.sql requires4 distinct disposable
+  existing Auth users without pilot rows; operator-run rollback-only role/grant/own
+  state/revocation/enrollment/tombstone/cascade checks. No Storage objects or remote
+  SQL execution.3 structural tests validate text, not applied PostgreSQL/RLS behavior.
+- Actual commands from both apps: npm run typecheck && npm run build && npm test.
+  Backend 8 files/118 tests, frontend 46 tests passed. Frontend build3.69s, entry426.86kB
+  and workspace199.74kB, no >500kB warning; existing optimizer workaround retained.
+- Lead integration also normalized accepted uppercase spot UUIDs before PostgreSQL
+  result comparison and added a transport regression test. Backend checks rerun
+  after this fix: typecheck/build and118 tests passed. Real MiniLM injected-HTTP
+  regression still returns11/11 positive hits versus7/11 keywords, negative empty;
+  no explored data enters its candidate text/model inputs.
+- Root setup/readmes/AGENTS/contract/board updated. No installs, private env reads,
+  remote SQL, deployment, commits or publishing. Existing search smoke evidence remains
+  user-reported; explored live persistence is NOT inferred from mocks or other slices.
+- Next: user applies0004 once, reopens a real eligible spot, toggles true/false with
+  reload/sign-out persistence and two-user isolation; then direct-token/SQL boundary
+  checks. Reporting/operator removal is the next separate required implementation slice.
+
+### User-run Explored smoke update — October8,2026
+
+- User reports: “checks pass,” in response to the listed six activation/check steps.
+- Record true/false state, reopening/reloading/sign-out/in persistence and independent
+  second-account state as user-confirmed browser smoke evidence. Migration activation
+  is included in the overall workflow report, without separately inspected SQL receipts.
+- Do not extend this report to direct table/RPC/grant checks, rollback SQL script,
+  audience revocation, tombstones/cascades, failure recovery, phone or a verified outing.
+- Documentation-only update; no code changes or new application test run. Existing
+  118 backend/46 frontend results remain the last executed passing checks.
+- Next required implementation: predefined reports and protected operator removal.
 
 ### Template for the next slice
 

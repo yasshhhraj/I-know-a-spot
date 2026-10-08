@@ -1,8 +1,8 @@
 # API contract — pilot authentication, spot sharing, Public discovery and search
 
-Scope: pilot authentication, spot creation/viewing/owner corrections, and the
-Public discovery/radius and semantic-search slices. Explored records and reports
-remain separate. The search contract below is agreed for this implementation;
+Scope: pilot authentication, spot creation/viewing/owner corrections, Public
+discovery/radius, semantic search and per-user explored state. Reports remain
+separate. Contracts below are agreed for their bounded implementations;
 implementation/check evidence belongs in WORKBOARD.md.
 
 ## GET /me
@@ -197,6 +197,41 @@ read connections-only spots; all enrolled accounts may open public spot details
 by ID regardless of the current discovery radius. Public listing enforces the
 saved radius; detail authorization remains based on enrollment/audience/removal.
 404 `NOT_FOUND` for unknown/deleted/inaccessible spots without revealing existence.
+
+### GET /spots/:id/explored and PUT /spots/:id/explored
+
+Require verified enrolled caller and current access to the active spot. Public
+detail/explored access remains radius-independent; connections-only follows the
+usual owner/mutual-connection rules. This concerns the viewer's own private state,
+not the spot owner's state or a verified physical visit.
+
+PUT requires `Content-Type: application/json` and exactly `{"explored":true}` or
+false, with a 2 KiB body bound. GET has no body/query; both forbid query parameters,
+client user IDs and unknown fields. Set a desired boolean, never invert server state.
+
+200 for both: `{"exploration":{"spotId":"<requested-uuid>","explored":true}}`.
+GET returns false for an absent own record only after a successful authorized table
+query; missing migration/schema/provider failure is503, not a false default. The
+response exposes no user IDs, timestamps, other participants' marks or public counts.
+
+Errors:400 BAD_REQUEST invalid ID/body/content type,401 UNAUTHORIZED,403 NOT_ENROLLED,
+neutral404 NOT_FOUND inaccessible/deleted/revoked spot,503 SERVICE_UNAVAILABLE
+configuration/schema/provider failure. All success/errors use private,no-store.
+
+New user-run migration0004: composite-key private `spot_explorations`, narrow grants,
+own/current-spot RLS and authenticated-only security-invoker `set_spot_explored` RPC.
+The backend uses a fresh publishable-key client with caller JWT, never admin fallback.
+Auth.uid() derives RPC identity; only explored may update. GET/PUT surround the
+operation with current spot authorization reads. Same-boolean repeated PUT is
+idempotent; concurrent clients' explicit sets are last-committed-write-wins.
+Tombstones hide marks via visibility; final spot deletion cascades records.
+
+Frontend loads detail-state separately, uses30s GET/35s PUT budgets, disables pending
+controls, and changes displayed state only on validated success. Uncertain writes
+offer explicit Reload state before another change; no blind/automatic retry and no
+claim a snapshot proves an in-flight write failed. Late responses after navigation/
+account changes are discarded. No explored data is sent to MiniLM or changes feeds.
+Migration and direct-user checks: EXPLORED_SETUP.md. Remote execution remains user-run.
 
 ### GET /spots/:id/photo
 
