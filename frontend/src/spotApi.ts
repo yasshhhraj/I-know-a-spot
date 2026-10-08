@@ -1,6 +1,8 @@
+import { normalizeCenter } from './discovery.ts'
+
 export type Audience = 'connections' | 'public'
 export type SpotData = { title: string; note: string; audience: Audience; latitude: number; longitude: number; accessConfirmed: true; accessNote: string }
-export type Spot = SpotData & { id: string; ownerId: string; authorName: string; createdAt: string; updatedAt: string; photoUrl: string }
+export type Spot = SpotData & { id: string; ownerId: string; authorName: string; createdAt: string; updatedAt: string; photoUrl: string; distanceKm?: number }
 export const spotIdPattern = /^[a-f\d]{8}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{4}-[a-f\d]{12}$/i
 export const SPOT_READ_TIMEOUT_MS = 15_000
 // Writes include auth/profile checks and, for creation, image processing plus
@@ -39,7 +41,9 @@ export function parseSpot(value: unknown, baseUrl: string): Spot | null {
       typeof data.latitude !== 'number' || typeof data.longitude !== 'number' ||
       (data.audience !== 'connections' && data.audience !== 'public') || data.accessConfirmed !== true ||
       validateData(data as SpotData)) return null
-  return { ...data as SpotData, id: value.id, ownerId: value.ownerId, authorName: value.authorName, createdAt: value.createdAt, updatedAt: value.updatedAt, photoUrl: value.photoUrl }
+  if (value.distanceKm !== undefined && (typeof value.distanceKm !== 'number' || !Number.isFinite(value.distanceKm) || value.distanceKm < 0)) return null
+  const distanceKm = value.distanceKm as number | undefined
+  return { ...data as SpotData, id: value.id, ownerId: value.ownerId, authorName: value.authorName, createdAt: value.createdAt, updatedAt: value.updatedAt, photoUrl: value.photoUrl, ...(distanceKm === undefined ? {} : { distanceKm }) }
 }
 
 export function photoEndpoint(baseUrl: string, path: string, id: string): string | null {
@@ -107,9 +111,24 @@ export function asSpot(payload: unknown, baseUrl: string, mutation = false): Spo
   if (!spot) throw new SpotApiError(safeFailure(0, null, mutation))
   return spot
 }
-export function asSpots(payload: unknown, baseUrl: string): Spot[] {
+export function asSpots(payload: unknown, baseUrl: string, feed: Audience = 'connections'): Spot[] {
   if (!isRecord(payload) || !Array.isArray(payload.spots) || payload.spots.length > 50) throw new SpotApiError(safeFailure(0, null, false))
   const spots = payload.spots.map(item => parseSpot(item, baseUrl))
-  if (spots.some(item => !item)) throw new SpotApiError(safeFailure(0, null, false))
+  if (spots.some(item => !item || (feed === 'public' && (item.audience !== 'public' || item.distanceKm === undefined)) || (feed === 'connections' && item.distanceKm !== undefined))) throw new SpotApiError(safeFailure(0, null, false))
   return spots as Spot[]
+}
+
+export function spotsPath(feed: 'connections' | 'public', center?: { latitude: number; longitude: number }): string {
+  if (feed === 'connections') return '/spots?feed=connections'
+  if (!center || !normalizeCenter(center.latitude, center.longitude)) throw new Error('Public discovery needs a valid center.')
+  const params = new URLSearchParams({ feed, centerLat: String(center.latitude), centerLon: String(center.longitude) })
+  return `/spots?${params.toString()}`
+}
+
+// Diagnostic read after an uncertain create. Only the authorized Connections
+// feed can include the caller's Connections-only and out-of-radius Public posts.
+// Its 50-row cap and eventual completion mean absence is never proof of failure.
+export async function readOwnConnectionSpots(base: string, token: string, ownerId: string, signal: AbortSignal): Promise<Spot[]> {
+  const rows = asSpots(await spotRequest(base, token, spotsPath('connections'), signal), base, 'connections')
+  return rows.filter(spot => spot.ownerId === ownerId)
 }

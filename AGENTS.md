@@ -6,11 +6,12 @@ Read `PRD.md`, `BUILD_SCOPE_36H.md`, and `WORKBOARD.md` before implementation.
 `FUTURE_SCOPE.md` is excluded unless the user explicitly changes scope.
 The release includes Connections/Public feeds, a top-center feed switch, saved
 Public radius, browser photo capture/selection, directions, and explored state.
-Auth and the spot-sharing/Connections-preview slice have local tests. The user
-reports live auth working, but direct RLS and spot/Storage/browser checks are still
-pending. Public feed/radius, AI, explored and reporting remain unimplemented.
-Read API_CONTRACT.md plus SUPABASE_SETUP.md and SPOT_SHARING_SETUP.md for user-run
-external steps; never mistake prepared migrations for applied policies.
+Auth/sharing and Connections/Public feed/radius have local tests. The user reports
+live auth/sharing/detail audience checks working. Public feed migration, true SQL
+radius/RLS, direct Storage and browser/phone checks remain pending. AI, explored
+and reporting remain unimplemented. Read API_CONTRACT.md plus SUPABASE_SETUP.md,
+SPOT_SHARING_SETUP.md and PUBLIC_DISCOVERY_SETUP.md for user-run external steps;
+never mistake prepared migrations for applied policies.
 
 ## Stack and ownership
 

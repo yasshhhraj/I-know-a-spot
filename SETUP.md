@@ -4,16 +4,19 @@
 
 - `frontend/`: React/TypeScript/Vite + Tailwind, pilot email/password sign-in,
   session restoration/sign-out, protected profile gate, sharing form, Leaflet pin
-  picker, Connections preview, protected photos, owner edits/deletion and directions;
+  picker, Connections/Public feed/map switch, saved radius/manual discovery center,
+  protected photos, owner edits/deletion and directions;
   static-buildable. The sharing workspace is lazy-loaded with a failure boundary.
 - `backend/`: Node/TypeScript/Fastify with `GET /me` verifying caller/enrollment;
-  authenticated spot/detail/media and owner create/edit/delete endpoints;
+  authenticated spot/detail/media and owner create/edit/delete endpoints, Public
+  caller-JWT RPC adapter and caller-scoped radius PATCH /me;
   `GET /health` still reports `{"status":"scaffold"}`, not service readiness.
 - Supabase migrations are prepared, never executed by the assistant. User-reported
   live auth is partial evidence; direct RLS and spot/Storage setup remain unverified.
-  See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) and
-  [SPOT_SHARING_SETUP.md](SPOT_SHARING_SETUP.md) for user-run steps.
-- Full Connections/Public feed/map switch, radius editing/discovery area, AI,
+  See [SUPABASE_SETUP.md](SUPABASE_SETUP.md),
+  [SPOT_SHARING_SETUP.md](SPOT_SHARING_SETUP.md) and
+  [PUBLIC_DISCOVERY_SETUP.md](PUBLIC_DISCOVERY_SETUP.md) for user-run steps.
+- Public feed/radius is local-only until its new migration/live checks pass. AI,
   explored state, reporting and native app are not implemented.
 - `AGENTS.md`, scoped AGENTS files, `.opencode/agents/`, and `WORKBOARD.md` provide
   local agent workflow. Existing DevRelay skills/configuration are preserved.
@@ -58,6 +61,9 @@ build; `dist/index.html` and assets are the later Capacitor packaging input.
 Frontend example keys:
 - `VITE_API_BASE_URL`: http://localhost:3001 for local development.
 - `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`: public project values only.
+- Optional `VITE_PILOT_CENTER_LAT`, `VITE_PILOT_CENTER_LON`: public, labelled pilot
+  area fallback. Missing/invalid values require explicit manual choice for Public;
+  no device location is inferred or automatically requested.
 
 VITE_ values are shipped to browsers. Never place a service-role or secret key
 there. Restart the dev server after changing environment files.
@@ -187,3 +193,14 @@ Spot/Storage migration, real upload/read/edit/delete, audience revocation, direc
 Storage/RLS, tile-failure and lazy-chunk recovery, camera/phone and directions
 checks are **unrun**. Use SPOT_SHARING_SETUP.md; no live photo-protection or full
 pilot-readiness claim follows from mocked transport and generated-image tests.
+
+### Public discovery/radius — October 8, 2026
+
+Lead ran `npm run typecheck && npm run build && npm test` in both apps: backend
+86 tests and frontend 32 tests passed. Frontend build 3.05s; entry JS 426.86 kB,
+workspace 188.47 kB. Preserved tree-shaking workaround and installed stack.
+
+Prepared `202610080003_public_feed_radius.sql` and rollback-only operator SQL
+boundary script. Neither was executed. Live Public feed/radius, direct RPC grants,
+PostgreSQL distance boundaries and browser map/picker/StrictMode checks are unrun.
+See PUBLIC_DISCOVERY_SETUP.md. No new credentials, dependencies or deployment.

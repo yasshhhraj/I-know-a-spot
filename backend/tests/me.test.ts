@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { createApp } from '../src/app.js';
 import { readConfig } from '../src/config.js';
-import { createProfileProvider, type ProfileProvider, type SupabaseTransport } from '../src/profile.js';
+import { createProfileProvider, createProfileUpdater, type ProfileProvider, type SupabaseTransport } from '../src/profile.js';
 
 const userA = '00000000-0000-0000-0000-000000000001';
 const userB = '00000000-0000-0000-0000-000000000002';
@@ -174,5 +174,80 @@ describe('Supabase user-scoped adapter', () => {
     expect(dbCalls.map((call) => [call.token, call.query.get('user_id')]).sort()).toEqual([
       ['Bearer token-a', `eq.${userA}`], ['Bearer token-b', `eq.${userB}`],
     ]);
+  });
+});
+
+describe('PATCH /me saved radius', () => {
+  const provider = async (token: string) => token === 'unenrolled' ? { kind: 'not_enrolled' as const }
+    : token === 'expired' ? { kind: 'unauthorized' as const }
+      : { kind: 'ok' as const, profile: { id: userA, displayName: 'Caller', publicRadiusKm: 5 } };
+  const updater = vi.fn(async (_token: string, _id: string, radius: number) => ({ kind: 'ok' as const, profile: { id: userA, displayName: 'Caller', publicRadiusKm: radius } }));
+  afterEach(() => updater.mockClear());
+  const patch = (payload: unknown, authorization = 'Bearer token-a') => ({ method: 'PATCH' as const, url: '/me', headers: { authorization, 'content-type': 'application/json' }, payload });
+
+  it.each([1, 25])('updates %i and responds with the existing private profile shape', async (radius) => {
+    app = createApp(config, provider, undefined, updater);
+    const response = await app.inject(patch({ publicRadiusKm: radius }));
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ profile: { id: userA, displayName: 'Caller', publicRadiusKm: radius } });
+    expect(response.headers['cache-control']).toBe('private, no-store');
+    expect(updater).toHaveBeenCalledExactlyOnceWith('token-a', userA, radius);
+  });
+  it('rejects extra/unknown/missing/noninteger/out-of-range body before writing', async () => {
+    app = createApp(config, provider, undefined, updater);
+    for (const payload of [{ publicRadiusKm: 5, userId: userB }, { radius: 5 }, {}, { publicRadiusKm: 0 },
+      { publicRadiusKm: 26 }, { publicRadiusKm: 5.5 }, { publicRadiusKm: '5' }, { publicRadiusKm: null }, []]) {
+      const response = await app.inject(patch(payload));
+      expect(response.statusCode).toBe(400);
+      expect(response.json().error.code).toBe('BAD_REQUEST');
+      expect(response.headers['cache-control']).toBe('private, no-store');
+    }
+    const malformed = await app.inject({ ...patch('{}'), payload: '{bad' });
+    expect(malformed.statusCode).toBe(400);
+    expect(malformed.json().error.code).toBe('BAD_REQUEST');
+    const unsupported = await app.inject({ method: 'PATCH', url: '/me', headers: { authorization: 'Bearer token-a', 'content-type': 'application/octet-stream' }, payload: Buffer.from('not JSON') });
+    expect(unsupported.statusCode).toBe(400);
+    expect(unsupported.json().error.code).toBe('BAD_REQUEST');
+    expect(updater).not.toHaveBeenCalled();
+  });
+  it('requires enrollment before updating and fails safely on provider/schema error', async () => {
+    app = createApp(config, provider, undefined, updater);
+    for (const [authorization, status] of [['Bearer unenrolled', 403], ['Bearer expired', 401], ['', 401]] as const) {
+      const response = await app.inject(patch({ publicRadiusKm: 10 }, authorization));
+      expect(response.statusCode).toBe(status);
+      expect(response.headers['cache-control']).toBe('private, no-store');
+    }
+    expect(updater).not.toHaveBeenCalled();
+    updater.mockRejectedValueOnce(new Error('private provider error'));
+    const response = await app.inject(patch({ publicRadiusKm: 10 }));
+    expect(response.statusCode).toBe(503);
+    expect(response.json().error.code).toBe('SERVICE_UNAVAILABLE');
+    expect(response.body).not.toContain('private provider');
+  });
+
+  it('uses fresh publishable caller-JWT clients, updates only own radius, and rejects zero/mismatched/error rows', async () => {
+    const calls: Array<{ path: string; method: string; token: string; key: string; query: URLSearchParams; body: unknown }> = [];
+    let row: object | null = { user_id: userA, display_name: 'Caller', enrolled: true, public_radius_km: 10 };
+    let status = 200;
+    const fetcher: SupabaseTransport = async (input, init) => {
+      const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url);
+      const headers = new Headers(init?.headers);
+      calls.push({ path: url.pathname, method: init?.method ?? 'GET', token: headers.get('authorization') ?? '', key: headers.get('apikey') ?? '', query: url.searchParams, body: JSON.parse(String(init?.body)) });
+      return new Response(JSON.stringify(status === 200 ? row : { message: 'private error' }), { status, headers: { 'Content-Type': 'application/json' } });
+    };
+    const update = createProfileUpdater(config.supabaseUrl, config.supabasePublishableKey, fetcher);
+    expect(await update('token-a', userA, 10)).toEqual({ kind: 'ok', profile: { id: userA, displayName: 'Caller', publicRadiusKm: 10 } });
+    expect(calls[0]).toMatchObject({ path: '/rest/v1/pilot_members', method: 'PATCH', token: 'Bearer token-a', key: 'sb_publishable_test', body: { public_radius_km: 10 } });
+    expect(calls[0].query.get('user_id')).toBe(`eq.${userA}`);
+    expect(calls[0].query.get('enrolled')).toBe('eq.true');
+    expect(calls[0].query.get('select')).toBe('user_id,display_name,enrolled,public_radius_km');
+    row = null;
+    expect(await update('token-a', userA, 10)).toEqual({ kind: 'unavailable' });
+    row = { user_id: userB, display_name: 'Other', enrolled: true, public_radius_km: 10 };
+    expect(await update('token-a', userA, 10)).toEqual({ kind: 'unavailable' });
+    status = 503;
+    expect(await update('token-a', userA, 10)).toEqual({ kind: 'unavailable' });
+    expect(await createProfileUpdater(undefined, undefined, fetcher)('token-a', userA, 10)).toEqual({ kind: 'unavailable' });
+    expect(calls).toHaveLength(4);
   });
 });

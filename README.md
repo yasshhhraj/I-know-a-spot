@@ -10,6 +10,10 @@ Mobile-web pilot with a later Capacitor path. See [PRD.md](PRD.md), the
   and live auth/RLS verification steps.
 - [SPOT_SHARING_SETUP.md](SPOT_SHARING_SETUP.md): user-run spot/private-Storage
   migration, backend-only admin configuration and live audience/media checks.
+- [NEXT_FEATURE_PLAN.md](NEXT_FEATURE_PLAN.md): implementation handoff for the
+  Public feed, saved-radius and manual discovery-area slice.
+- [PUBLIC_DISCOVERY_SETUP.md](PUBLIC_DISCOVERY_SETUP.md): new Public-feed migration,
+  manual area/radius setup and user-run live boundary checks.
 - [API_CONTRACT.md](API_CONTRACT.md): protected profile and spot/media API contract.
 - [frontend/](frontend/): React/TypeScript/Vite app (port 5173).
 - [backend/](backend/): Node/TypeScript/Fastify API (port 3001).
@@ -17,11 +21,12 @@ Mobile-web pilot with a later Capacitor path. See [PRD.md](PRD.md), the
 - `.opencode/agents/`: frontend/backend implementation agent definitions.
 
 **Incomplete pilot, locally tested:** auth plus photo/pin/note/audience sharing,
-Connections preview, protected photo retrieval, detail/directions and owner
-metadata edits/deletion are implemented. Both apps typecheck/build; backend
-73 tests and frontend 22 tests pass. User-reported enrolled/unenrolled login and
-session restoration work; spot/Storage migration and live media/RLS/browser checks
-are still pending. Public feed/switch, radius editing/manual discovery center,
+Connections/Public feed switch and map, saved radius/manual discovery center,
+protected photo retrieval, detail/directions and owner metadata edits/deletion are
+implemented. Both apps typecheck/build; backend 86 tests and frontend 32 tests pass.
+User reports live auth/sharing, owner/connection photos, deletion and unconnected
+private-denial/Public-detail access working. The new Public-feed migration and
+live radius/RPC/browser checks are pending; direct Storage/security checks remain.
 AI, explored state, reporting and native wrapping are unimplemented. Packages
 were installed by the user. Earlier DevRelay setup below is historical context,
 not proof of application functionality.

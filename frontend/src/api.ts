@@ -7,13 +7,53 @@ function record(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
+export function parseProfile(value: unknown, userId?: string): Profile | null {
+  if (!record(value)) return null
+  const { id, displayName, publicRadiusKm } = value
+  if (typeof id !== 'string' || (userId && id !== userId) || typeof displayName !== 'string' || !displayName.trim() ||
+      typeof publicRadiusKm !== 'number' || !Number.isInteger(publicRadiusKm) || publicRadiusKm < 1 || publicRadiusKm > 25) return null
+  return { id, displayName, publicRadiusKm }
+}
+
+export function radiusValue(value: string): number | null {
+  if (!/^\d+$/.test(value.trim())) return null
+  const number = Number(value.trim())
+  return Number.isInteger(number) && number >= 1 && number <= 25 ? number : null
+}
+
+export class RadiusError extends Error {
+  readonly kind: 'auth' | 'invalid' | 'unavailable' | 'uncertain'
+  constructor(kind: 'auth' | 'invalid' | 'unavailable' | 'uncertain', message: string) { super(message); this.kind = kind }
+}
+
+export async function saveRadius(baseUrl: string, token: string, userId: string, radius: number, signal: AbortSignal): Promise<Profile> {
+  if (!Number.isInteger(radius) || radius < 1 || radius > 25) throw new RadiusError('invalid', 'Enter a whole-number radius from 1 to 25 km.')
+  const request = new AbortController()
+  const abort = () => request.abort()
+  if (signal.aborted) request.abort()
+  else signal.addEventListener('abort', abort, { once: true })
+  const timer = setTimeout(abort, 35_000)
+  try {
+    const response = await fetch(`${baseUrl}/me`, { method: 'PATCH', body: JSON.stringify({ publicRadiusKm: radius }), headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, cache: 'no-store', signal: request.signal })
+    if (request.signal.aborted) throw new RadiusError('uncertain', 'Radius save may have completed. Reload and verify your profile before saving again.')
+    let body: unknown
+    try { body = await response.json() } catch { throw new RadiusError('uncertain', 'Radius save response could not be verified. Reload and verify your profile before saving again.') }
+    if (response.status === 401 || response.status === 403) throw new RadiusError('auth', 'Pilot access needs verification.')
+    if (response.status === 400) throw new RadiusError('invalid', 'Enter a whole-number radius from 1 to 25 km.')
+    if (!response.ok) throw new RadiusError('uncertain', 'Radius save may have completed. Reload and verify your profile before saving again.')
+    const profile = record(body) && parseProfile(body.profile, userId)
+    if (!profile || request.signal.aborted || profile.publicRadiusKm !== radius) throw new RadiusError('uncertain', 'Radius save response could not be verified. Reload and verify your profile before saving again.')
+    return profile
+  } catch (error) {
+    if (error instanceof RadiusError) throw error
+    throw new RadiusError('uncertain', 'Radius save may have completed. Reload and verify your profile before saving again.')
+  } finally { clearTimeout(timer); signal.removeEventListener('abort', abort) }
+}
+
 export function parseMe(status: number, body: unknown, userId: string): MeResult {
   if (status === 200 && record(body) && record(body.profile)) {
-    const { id, displayName, publicRadiusKm } = body.profile
-    if (id === userId && typeof displayName === 'string' && displayName.trim().length > 0 &&
-        Number.isInteger(publicRadiusKm) && (publicRadiusKm as number) >= 1 && (publicRadiusKm as number) <= 25) {
-      return { kind: 'enrolled', profile: { id, displayName, publicRadiusKm: publicRadiusKm as number } }
-    }
+    const profile = parseProfile(body.profile, userId)
+    if (profile) return { kind: 'enrolled', profile }
   }
   if (record(body) && record(body.error) && typeof body.error.message === 'string') {
     if (status === 401 && body.error.code === 'UNAUTHORIZED') return { kind: 'expired' }

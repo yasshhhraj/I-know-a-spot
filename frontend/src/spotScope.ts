@@ -40,3 +40,20 @@ export class SpotScope {
     } finally { this.pending.delete(request) }
   }
 }
+
+// Effect setup owns one scope. React StrictMode may run setup/cleanup/setup;
+// never reuse the disposed scope from the first setup on the second pass.
+export class FeedScopeLifecycle {
+  private active: SpotScope | null = null
+  begin(): SpotScope {
+    this.active?.dispose()
+    const scope = new SpotScope()
+    this.active = scope
+    return scope
+  }
+  invalidate() { this.active?.invalidate() }
+  end(scope: SpotScope) {
+    scope.dispose()
+    if (this.active === scope) this.active = null
+  }
+}

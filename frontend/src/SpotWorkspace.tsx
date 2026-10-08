@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
-import type { Profile } from './api'
+import { radiusValue, RadiusError, saveRadius, type Profile } from './api'
 import { getSupabaseClient } from './supabase'
-import { apiBaseUrl } from './config'
+import { apiBaseUrl, normalizeCenter, pilotCenter, type Center } from './config'
 import { SpotMap } from './SpotMap'
-import { SpotScope } from './spotScope'
-import { asSpot, asSpots, multipart, photoEndpoint, spotIdPattern, spotRequest, SpotApiError, validateData, validatePhoto, type Audience, type Spot, type SpotData } from './spotApi'
+import { FeedScopeLifecycle, SpotScope } from './spotScope'
+import { asSpot, asSpots, multipart, photoEndpoint, readOwnConnectionSpots, spotIdPattern, spotRequest, spotsPath, SpotApiError, validateData, validatePhoto, type Audience, type Spot, type SpotData } from './spotApi'
 
 type Props = { profile: Profile; recheck: () => void }
 const button = 'min-h-12 rounded-lg border border-stone-600 px-4 py-2 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50'
@@ -40,9 +40,9 @@ function ProtectedPhoto({ spot, scope, profile, recheck }: { spot: Spot; scope: 
   return url ? <img src={url} alt={`Shared photo of ${spot.title}`} className="max-h-80 w-full rounded-lg object-cover" /> : <p role="status">Loading protected photo…</p>
 }
 
-function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, refresh, recentSpots, listStatus }: {
+function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, refresh }: {
   initial: FormState; original?: Spot; scope: SpotScope; profile: Profile; recheck: () => void;
-  onSaved: (spot: Spot) => void; onCancel: () => void; refresh: () => void; recentSpots: Spot[]; listStatus: string
+  onSaved: (spot: Spot) => void; onCancel: () => void; refresh: () => void
 }) {
   const [fields, setFields] = useState(initial)
   const [file, setFile] = useState<File | null>(null)
@@ -50,6 +50,10 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
   const [message, setMessage] = useState('')
   const [pending, setPending] = useState(false)
   const [uncertain, setUncertain] = useState(false)
+  const [reconciliationStatus, setReconciliationStatus] = useState('')
+  const [ownCandidates, setOwnCandidates] = useState<Spot[]>([])
+  const reconciliation = useRef<SpotScope | null>(null)
+  useEffect(() => () => { reconciliation.current?.dispose(); reconciliation.current = null }, [])
   useEffect(() => {
     if (!file) { setPreview(null); return }
     const url = scope.track(file)
@@ -69,6 +73,24 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
     setFile(next)
   }
 
+  async function checkConnections() {
+    reconciliation.current?.dispose()
+    const lookup = new SpotScope()
+    reconciliation.current = lookup
+    setOwnCandidates([])
+    setReconciliationStatus('Checking your own spots in Connections…')
+    try {
+      const candidates = await lookup.run(profile.id, async () => (await getSupabaseClient().auth.getSession()).data.session,
+        (token, signal) => readOwnConnectionSpots(apiBaseUrl, token, profile.id, signal))
+      if (reconciliation.current === lookup && candidates) {
+        setOwnCandidates(candidates)
+        setReconciliationStatus('Connections check complete. A missing spot is not proof the save failed; processing may still be underway or the 50-row feed may be full.')
+      }
+    } catch (error) {
+      if (reconciliation.current === lookup) setReconciliationStatus(`Connections check unavailable. ${failure(error, recheck)} Do not resubmit based on this check.`)
+    }
+  }
+
   async function save(event: FormEvent) {
     event.preventDefault()
     if (pending) return
@@ -76,7 +98,8 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
     const problem = validateData(data) || (!original && validatePhoto(file))
     if (problem) { setMessage(problem); return }
     const validated = data as SpotData
-    setPending(true); setMessage(''); setUncertain(false)
+    reconciliation.current?.dispose(); reconciliation.current = null
+    setPending(true); setMessage(''); setUncertain(false); setReconciliationStatus(''); setOwnCandidates([])
     try {
       const saved = await scope.run(profile.id, async () => (await getSupabaseClient().auth.getSession()).data.session, async (token, signal) => {
         const payload = original
@@ -87,7 +110,7 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
       if (saved) onSaved(saved)
     } catch (err) {
       setMessage(failure(err, recheck))
-      if (err instanceof SpotApiError && err.failure.kind === 'uncertain') { setUncertain(true); refresh() }
+      if (err instanceof SpotApiError && err.failure.kind === 'uncertain') { setUncertain(true); refresh(); if (!original) void checkConnections() }
     } finally { setPending(false) }
   }
 
@@ -106,15 +129,15 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
     <fieldset className="space-y-2"><legend className="font-medium">Audience</legend>
       <label className="block"><input type="radio" checked={fields.audience === 'connections'} onChange={() => change('audience', 'connections')} /> Connections only (default)</label>
       <label className="block"><input type="radio" checked={fields.audience === 'public'} onChange={() => change('audience', 'public')} /> Public</label>
-      {fields.audience === 'public' && <p className="rounded-lg bg-amber-50 p-3 text-amber-950">Unfamiliar enrolled pilot members can open this spot by ID and see your display name, photo, note and exact destination pin. Public discovery is not yet available here.</p>}
+      {fields.audience === 'public' && <p className="rounded-lg bg-amber-50 p-3 text-amber-950">Unfamiliar enrolled pilot members can discover this spot in Public and see your display name, photo, note and exact destination pin.</p>}
     </fieldset>
-    <div><p className="font-medium">Destination pin (required)</p><p className="mb-2 text-sm">Map overview is not your current location. Tap/click the map to select a pin, or enter coordinates below. Map tiles load from an external provider; no location permission is requested.</p><SpotMap pin={pin} onPick={(lat, lng) => setFields(current => ({ ...current, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }))} /></div>
+    <div><p className="font-medium">Destination pin (required)</p><p className="mb-2 text-sm">Map overview is not your current location. Tap/click the map to select a pin, or enter coordinates below. Map tiles load from an external provider; no location permission is requested.</p><SpotMap pin={pin} worldPicker onPick={(lat, lng) => setFields(current => ({ ...current, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }))} /></div>
     <div className="grid gap-3 sm:grid-cols-2"><label>Latitude (-90 to 90)<input className={input} type="number" min={-90} max={90} step="any" inputMode="decimal" value={fields.latitude} onChange={e => change('latitude', e.target.value)} /></label><label>Longitude (-180 to 180)<input className={input} type="number" min={-180} max={180} step="any" inputMode="decimal" value={fields.longitude} onChange={e => change('longitude', e.target.value)} /></label></div>
     <p aria-live="polite">{pin ? `Selected destination: ${pin[0]}, ${pin[1]}` : 'No destination pin selected.'}</p>
     <label className="block">Known access restrictions (optional, max 200)<textarea className={input} maxLength={200} value={fields.accessNote} onChange={e => change('accessNote', e.target.value)} /></label>
     <label className="flex items-start gap-2"><input type="checkbox" className="mt-1 size-5" checked={fields.accessConfirmed} onChange={e => change('accessConfirmed', e.target.checked)} /><span>I confirm this is appropriate to share and publicly accessible. Avoid private homes, trespass, bystanders and sensitive wildlife locations. This is separate from the post audience.</span></label>
     {message && <p role="alert" className="text-red-800">{message}</p>}
-    {uncertain && <div className="rounded-lg border border-amber-700 p-3"><p className="font-semibold">Before submitting again:</p><ol className="list-inside list-decimal"><li>Wait for the connections preview to reload.</li><li>Check for a new spot with your title and photo.</li><li>If present, open it to confirm. If not, you can explicitly resubmit this preserved form.</li></ol><p role="status">{listStatus}</p><ul className="mt-2 list-inside list-disc">{recentSpots.map(spot => <li key={spot.id}>{spot.title} — {spot.createdAt} <a className="underline" href={`?spot=${spot.id}`} target="_blank" rel="noopener noreferrer">Inspect in new tab</a></li>)}</ul></div>}
+    {uncertain && <div className="rounded-lg border border-amber-700 p-3"><p className="font-semibold">Save outcome uncertain</p>{original ? <p>Inspect the existing spot before trying the edit again. A response timeout does not prove the edit failed. <a className="underline" href={`?spot=${original.id}`} target="_blank" rel="noopener noreferrer">Inspect existing spot in new tab</a></p> : <><p>Checking Connections separately from Public, which may omit your Connections-only or out-of-radius spot. A recent list read cannot prove a still-processing save failed; do not resubmit solely because it is absent.</p><p role="status" className="mt-2">{reconciliationStatus}</p><button className={`${button} mt-2`} type="button" onClick={() => void checkConnections()}>Check Connections again</button><ul className="mt-2 list-inside list-disc">{ownCandidates.map(spot => <li key={spot.id}>{spot.title} — {spot.createdAt} <a className="underline" href={`?spot=${spot.id}`} target="_blank" rel="noopener noreferrer">Inspect own spot in new tab</a></li>)}</ul></>}</div>}
     <div className="flex flex-wrap gap-3">
     <button className={`${button} bg-emerald-800 text-white`} disabled={pending}>{pending ? 'Saving…' : original ? 'Save changes' : 'Share spot'}</button>
     <button type="button" className={button} disabled={pending} onClick={onCancel}>Cancel</button>
@@ -123,26 +146,73 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
 }
 
 function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }) {
+  const [feed, setFeed] = useState<Audience>('connections')
+  const [center, setCenter] = useState<Center | null>(pilotCenter)
+  const [centerSource, setCenterSource] = useState<'pilot' | 'manual' | null>(pilotCenter ? 'pilot' : null)
+  const [draftLat, setDraftLat] = useState(pilotCenter ? String(pilotCenter.latitude) : '')
+  const [draftLon, setDraftLon] = useState(pilotCenter ? String(pilotCenter.longitude) : '')
+  const [centerMessage, setCenterMessage] = useState('')
+  const [settings, setSettings] = useState(profile)
+  const [radiusDraft, setRadiusDraft] = useState(String(profile.publicRadiusKm))
+  const [radiusPending, setRadiusPending] = useState(false)
+  const [radiusMessage, setRadiusMessage] = useState('')
+  const [radiusError, setRadiusError] = useState('')
   const [spots, setSpots] = useState<Spot[]>([])
-  const [listStatus, setListStatus] = useState('Loading connections preview…')
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [listStatus, setListStatus] = useState('Loading Connections…')
+  const [listKey, setListKey] = useState('')
+  const feedScope = useRef(new FeedScopeLifecycle())
   const [detail, setDetail] = useState<Spot | null>(null)
   const [detailStatus, setDetailStatus] = useState('')
-  const [mode, setMode] = useState<'list' | 'detail' | 'add' | 'edit'>('list')
+  const [mode, setMode] = useState<'list' | 'detail' | 'add' | 'edit' | 'profile'>('list')
   const [cleanupId, setCleanupId] = useState<string | null>(null)
   const [busyDelete, setBusyDelete] = useState(false)
   const [revision, setRevision] = useState(0)
   const detailRevision = useRef(0)
   const refresh = () => setRevision(n => n + 1)
+  useEffect(() => { setSettings(profile); setRadiusDraft(String(profile.publicRadiusKm)) }, [profile.id, profile.displayName, profile.publicRadiusKm])
+  const requestKey = `${feed}:${center?.latitude ?? 'unset'}:${center?.longitude ?? 'unset'}:${settings.publicRadiusKm}:${revision}`
+  const visibleSpots = listKey === requestKey ? spots : []
+  const visibleStatus = listKey === requestKey ? listStatus : feed === 'public' && !center ? 'Choose a discovery center to browse Public spots.' : `Loading ${feed === 'public' ? 'Public' : 'Connections'}…`
+  const enteredCenter = normalizeCenter(draftLat.trim() ? Number(draftLat) : NaN, draftLon.trim() ? Number(draftLon) : NaN)
+  const stagedCenter = enteredCenter && (!center || enteredCenter.latitude !== center.latitude || enteredCenter.longitude !== center.longitude) ? enteredCenter : null
 
   useEffect(() => {
     let active = true
-    setListStatus('Loading connections preview…')
-    void scope.run(profile.id, async () => (await getSupabaseClient().auth.getSession()).data.session, async (token, signal) => asSpots(await spotRequest(apiBaseUrl, token, '/spots', signal), apiBaseUrl)).then(result => {
+    const requests = feedScope.current.begin()
+    setSpots([])
+    setListKey(requestKey)
+    if (feed === 'public' && !center) { setListStatus('Choose a discovery center to browse Public spots.'); return () => { active = false; feedScope.current.end(requests) } }
+    setListStatus(`Loading ${feed === 'public' ? 'Public' : 'Connections'}…`)
+    void requests.run(profile.id, async () => (await getSupabaseClient().auth.getSession()).data.session, async (token, signal) => asSpots(await spotRequest(apiBaseUrl, token, spotsPath(feed, center ?? undefined), signal), apiBaseUrl, feed)).then(result => {
       if (!active || !result) return
-      setSpots(result); setListStatus(result.length ? '' : 'No spots from you or your connections yet.')
+      setSpots(result); setListStatus(result.length ? '' : feed === 'public' ? 'No Public spots inside this radius. Adjust the radius in Profile or choose another center; the feed is not widened automatically.' : 'No spots from you or your connections yet.')
     }).catch(err => { if (active) { setSpots([]); setListStatus(failure(err, recheck)) } })
-    return () => { active = false }
-  }, [profile.id, scope, revision, recheck])
+    return () => { active = false; feedScope.current.end(requests) }
+  }, [profile.id, feed, center, settings.publicRadiusKm, revision, recheck, requestKey])
+
+  function chooseCenter(event: FormEvent) {
+    event.preventDefault()
+    const next = normalizeCenter(draftLat.trim() === '' ? NaN : Number(draftLat), draftLon.trim() === '' ? NaN : Number(draftLon))
+    if (!next) { setCenterMessage('Enter finite latitude (-90 to 90) and longitude (-180 to 180).'); return }
+    setCenterMessage('Manual discovery center confirmed. Map panning alone does not change it.')
+    setCenterSource('manual'); setCenter(next)
+  }
+
+  async function submitRadius(event: FormEvent) {
+    event.preventDefault()
+    if (radiusPending) return
+    const value = radiusValue(radiusDraft)
+    if (value === null) { setRadiusError('Enter a whole-number radius from 1 to 25 km.'); setRadiusMessage(''); return }
+    setRadiusPending(true); setRadiusError(''); setRadiusMessage('')
+    try {
+      const result = await scope.run(profile.id, async () => (await getSupabaseClient().auth.getSession()).data.session, (token, signal) => saveRadius(apiBaseUrl, token, profile.id, value, signal))
+      if (result) { setSettings(result); setRadiusDraft(String(result.publicRadiusKm)); setRadiusMessage(`Saved ${result.publicRadiusKm} km. Public results will refresh.`); refresh() }
+    } catch (error) {
+      if (error instanceof RadiusError) { if (error.kind === 'auth') recheck(); setRadiusError(error.message) }
+      else setRadiusError('Radius save unavailable. Your previous saved radius remains displayed.')
+    } finally { setRadiusPending(false) }
+  }
 
   async function open(id: string) {
     const request = ++detailRevision.current
@@ -198,23 +268,39 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
   }
 
   return <section className="mt-8 border-t border-stone-300 pt-6" aria-label="Spot workspace">
-    <h3 className="text-xl font-semibold">Connections preview</h3>
-    <p className="mt-2 text-sm">Newest 50 spots from you and enrolled connections, including their Public posts. This is not the Public radius feed. Server authorization controls direct spot and photo requests; this screen is not an access rule.</p>
+    <div className="flex justify-center"><div role="group" aria-label="Discovery feed" className="inline-flex rounded-lg border border-emerald-800 p-1">
+      {(['connections', 'public'] as const).map(value => <button key={value} type="button" aria-pressed={feed === value} className={`${button} border-0 ${feed === value ? 'bg-emerald-800 text-white' : 'bg-white'}`} onClick={() => { if (feed !== value) { feedScope.current.invalidate(); back(); setFeed(value) } }}>{value === 'public' ? 'Public' : 'Connections'}</button>)}
+    </div></div>
+    <h3 className="mt-4 text-xl font-semibold">{feed === 'public' ? 'Public discoveries' : 'Connections'}</h3>
+    <p className="mt-2 text-sm">{feed === 'public' ? `Public posts within your saved ${settings.publicRadiusKm} km straight-line radius of the ${centerSource === 'pilot' ? 'configured pilot area' : centerSource === 'manual' ? 'chosen manual area' : 'center you choose'}. Distance is approximate, not travel time.` : 'Newest spots from you and your enrolled connections, including their Public posts.'} Only the server-returned feed is shown; list filtering is not authorization. AI search, explored state and reports are not yet available.</p>
     {mode === 'list' && <>
-      <button className={`${button} mt-4 bg-emerald-800 text-white`} onClick={() => setMode('add')}>Add a spot</button>
-      <button className={`${button} ml-2 mt-4`} onClick={refresh}>Reload preview</button>
-      {listStatus && <p role="status" className="mt-4">{listStatus}</p>}
+      {feed === 'public' && <div className="mt-4 rounded-lg border border-stone-300 p-3">
+        <h4 className="font-semibold">Discovery center</h4>
+        <p className="text-sm">{center ? `${centerSource === 'pilot' ? 'Configured pilot area' : 'Manually chosen area'}: ${center.latitude}, ${center.longitude}. Not your current location. Map panning does not change discovery.` : 'No pilot area is configured. Choose and confirm a manual center below (or ask the operator to configure a labelled pilot center). No device location is requested.'}</p>
+        <form onSubmit={chooseCenter} className="mt-3 space-y-2"><div className="grid gap-3 sm:grid-cols-2"><label>Center latitude (-90 to 90)<input className={input} type="number" inputMode="decimal" min={-90} max={90} step="any" value={draftLat} onChange={e => setDraftLat(e.target.value)} /></label><label>Center longitude (-180 to 180)<input className={input} type="number" inputMode="decimal" min={-180} max={180} step="any" value={draftLon} onChange={e => setDraftLon(e.target.value)} /></label></div>
+          <button type="submit" className={button}>Confirm discovery center</button>
+        </form>
+        {pilotCenter && centerSource !== 'pilot' && <button type="button" className={`${button} mt-2`} onClick={() => { const fallback = pilotCenter; if (!fallback) return; setCenter(fallback); setCenterSource('pilot'); setDraftLat(String(fallback.latitude)); setDraftLon(String(fallback.longitude)); setCenterMessage('Configured pilot area restored.') }}>Use configured pilot area</button>}
+        {centerMessage && <p role="status" className="mt-2">{centerMessage}</p>}
+        <p className="mt-2 text-sm">Enter approximate coordinates to display the map, or tap it to stage a center; confirm before Public results change. Numeric entry works without map tiles.</p>
+      </div>}
+      <div className="mt-4 flex flex-wrap gap-2"><button className={`${button} bg-emerald-800 text-white`} onClick={() => setMode('add')}>Add a spot</button>
+      <button className={button} onClick={refresh}>Reload {feed === 'public' ? 'Public' : 'Connections'}</button>
+      <button className={button} onClick={() => setMode('profile')}>Profile &amp; radius</button></div>
+      <div className="mt-4"><SpotMap center={feed === 'public' && center ? [center.latitude, center.longitude] : undefined} stagedCenter={feed === 'public' && stagedCenter ? [stagedCenter.latitude, stagedCenter.longitude] : undefined} viewCenter={feed === 'public' && stagedCenter ? [stagedCenter.latitude, stagedCenter.longitude] : feed === 'connections' && visibleSpots.length ? [visibleSpots[0].latitude, visibleSpots[0].longitude] : undefined} radiusKm={feed === 'public' && center ? settings.publicRadiusKm : undefined} spots={visibleSpots} selectedId={selectedId} onSelect={openDetail} onPick={feed === 'public' ? (lat, lon) => { const next = normalizeCenter(lat, lon); if (next) { setDraftLat(String(lat)); setDraftLon(String(lon)); setCenterMessage('Map center staged. Results still use the confirmed center until you confirm this one.') } } : undefined} /></div>
+      {visibleStatus && <p role="status" className="mt-4">{visibleStatus}</p>}
       {detailStatus && <p role="alert" className="mt-4 text-red-800">{detailStatus}</p>}
       {cleanupId && <p role="alert" className="mt-4">Spot is hidden, but photo cleanup is pending. <button className={button} disabled={busyDelete} onClick={() => void remove(cleanupId)}>Retry deletion</button></p>}
-      <ul className="mt-4 space-y-4">{spots.map(spot => <li key={spot.id} className="rounded-lg border border-stone-300 p-3">
+      <ul className="mt-4 space-y-4">{visibleSpots.map(spot => <li key={spot.id} className="rounded-lg border border-stone-300 p-3">
         <ProtectedPhoto spot={spot} scope={scope} profile={profile} recheck={recheck} />
         <h4 className="mt-2 font-semibold">{spot.title}</h4><p className="whitespace-pre-wrap break-words">{spot.note.slice(0, 160)}{spot.note.length > 160 ? '…' : ''}</p>
-        <p className="text-sm">{spot.authorName} · {spot.audience === 'public' ? 'Public' : 'Connections only'}</p>
-        <button className={`${button} mt-2`} onClick={() => openDetail(spot.id)}>Open spot</button>
+        <p className="text-sm">{spot.authorName} · {spot.audience === 'public' ? 'Public' : 'Connections only'}{feed === 'public' && spot.distanceKm !== undefined ? ` · ${spot.distanceKm.toFixed(1)} km approx. straight-line` : ''}</p>
+        <button className={`${button} mt-2`} onFocus={() => setSelectedId(spot.id)} onBlur={() => setSelectedId(null)} onMouseEnter={() => setSelectedId(spot.id)} onMouseLeave={() => setSelectedId(null)} onClick={() => openDetail(spot.id)}>Open spot</button>
       </li>)}</ul>
     </>}
+    {mode === 'profile' && <div className="mt-4 space-y-3"><button className={button} onClick={() => setMode('list')}>Back to {feed === 'public' ? 'Public' : 'Connections'}</button><h4 className="text-xl font-semibold">Profile</h4><p>Display name (fixed): {settings.displayName}</p><p>Saved Public discovery radius: {settings.publicRadiusKm} km</p><form onSubmit={e => void submitRadius(e)} className="space-y-3"><label className="block">Public discovery radius (1–25 km)<input className={input} type="number" min={1} max={25} step={1} inputMode="numeric" value={radiusDraft} disabled={radiusPending} onChange={e => setRadiusDraft(e.target.value)} /></label><button className={`${button} bg-emerald-800 text-white`} disabled={radiusPending}>{radiusPending ? 'Saving radius…' : 'Save radius'}</button></form>{radiusMessage && <p role="status">{radiusMessage}</p>}{radiusError && <p role="alert" className="text-red-800">{radiusError} Saved value remains {settings.publicRadiusKm} km.</p>}</div>}
     {mode === 'detail' && <>
-      <button className={button} onClick={back}>Back to preview</button>
+      <button className={button} onClick={back}>Back to {feed === 'public' ? 'Public' : 'Connections'}</button>
       {detailStatus && <p role="status" className="mt-4">{detailStatus}</p>}
       {detail && <article className="mt-4 space-y-3">
         <h4 className="text-2xl font-semibold">{detail.title}</h4>
@@ -227,8 +313,8 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
         {detail.ownerId === profile.id && <div className="flex gap-3"><button className={button} onClick={() => setMode('edit')}>Edit metadata</button><button className={button} disabled={busyDelete} onClick={() => void remove(detail.id)}>{busyDelete ? 'Deleting…' : 'Delete spot'}</button></div>}
       </article>}
     </>}
-    {mode === 'add' && <Form scope={scope} profile={profile} recheck={recheck} initial={empty()} refresh={refresh} recentSpots={spots} listStatus={listStatus} onCancel={back} onSaved={spot => { setSpots(current => [spot, ...current.filter(s => s.id !== spot.id)]); refresh(); openDetail(spot.id) }} />}
-    {mode === 'edit' && detail && <Form key={detail.id} scope={scope} profile={profile} recheck={recheck} original={detail} initial={{ title: detail.title, note: detail.note, audience: detail.audience, accessNote: detail.accessNote, accessConfirmed: true, latitude: String(detail.latitude), longitude: String(detail.longitude) }} refresh={refresh} recentSpots={spots} listStatus={listStatus} onCancel={() => setMode('detail')} onSaved={spot => { setDetail(spot); setSpots(current => current.map(s => s.id === spot.id ? spot : s)); setMode('detail'); refresh() }} />}
+    {mode === 'add' && <Form scope={scope} profile={profile} recheck={recheck} initial={empty()} refresh={refresh} onCancel={back} onSaved={spot => { refresh(); openDetail(spot.id) }} />}
+    {mode === 'edit' && detail && <Form key={detail.id} scope={scope} profile={profile} recheck={recheck} original={detail} initial={{ title: detail.title, note: detail.note, audience: detail.audience, accessNote: detail.accessNote, accessConfirmed: true, latitude: String(detail.latitude), longitude: String(detail.longitude) }} refresh={refresh} onCancel={() => setMode('detail')} onSaved={spot => { setDetail(spot); setMode('detail'); refresh() }} />}
   </section>
 }
 

@@ -1,6 +1,6 @@
 # I Know a Spot — frontend pilot sharing slice
 
-React + TypeScript + Vite mobile web app with Tailwind CSS v4, Leaflet and Supabase Auth. Pre-created pilot accounts can sign in and verify enrollment with `GET /me`. For an enrolled account the spot workspace offers a **Connections preview** (up to 50, newest first), create/edit/delete, protected photo display, detail by `?spot=<id>`, and external directions. This is an incomplete pilot: there is **no Public feed/switch, radius or manual discovery-area editor, AI search, explored state, or reporting UI**. Product requirements are in [../PRD.md](../PRD.md) and the current release plan in [../BUILD_SCOPE_36H.md](../BUILD_SCOPE_36H.md).
+React + TypeScript + Vite mobile web app with Tailwind CSS v4, Leaflet and Supabase Auth. Pre-created pilot accounts can sign in and verify enrollment with `GET /me`. The workspace offers **Connections/Public feeds** (up to 50), a matching map, saved radius/manual center, create/edit/delete, protected photo display, detail by `?spot=<id>`, and external directions. Public feed/radius requires its separate migration and live verification; AI search, explored state and reporting remain unavailable. Product requirements are in [../PRD.md](../PRD.md) and the current release plan in [../BUILD_SCOPE_36H.md](../BUILD_SCOPE_36H.md).
 
 ## Local setup
 
@@ -41,13 +41,20 @@ The demo is online-only. Account creation/enrollment and RLS are operator/backen
 
 ## Current build caveat
 
-Latest lead checks: typecheck/build and **22 tests** pass. The enrolled workspace
+Latest lead checks: typecheck/build and **32 tests** pass. The enrolled workspace
 loads through React.lazy/Suspense and a scoped failure boundary; a failed chunk
 offers a deliberate page reload while sign-out remains outside the boundary.
-Build output is 424.87 kB entry JS + 178.74 kB workspace, with no >500 kB warning.
+Build output is 426.86 kB entry JS + 188.47 kB workspace, with no >500 kB warning.
 These are build measurements, not verified browser performance. Unicode response
 limits match backend code points; HTML maxLength remains conservative for emoji.
 Use [../SPOT_SHARING_SETUP.md](../SPOT_SHARING_SETUP.md) for the unrun live checks.
+
+Public discovery setup is in [../PUBLIC_DISCOVERY_SETUP.md](../PUBLIC_DISCOVERY_SETUP.md).
+Optional public Vite pilot-center latitude/longitude fallbacks are labelled as an
+area, not user location. Without them, choose/confirm a manual center. Only radius
+persists on the backend; no automatic device-location access or center storage.
+Each feed effect owns a fresh request scope for StrictMode cleanup/setup replay.
+Node lifecycle tests are not browser/Leaflet or real SQL/RLS verification.
 
 Local production builds with Vite 7.1.9 / Rollup 4.64.1 hung in the optimizer path.
 `vite.config.ts` temporarily disables tree-shaking; typechecking, bundling, CSS,

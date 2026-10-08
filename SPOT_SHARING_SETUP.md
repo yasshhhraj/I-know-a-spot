@@ -5,6 +5,11 @@ No SQL, Storage configuration, accounts, private env files, or deployments were
 changed by the assistant. Apply external changes yourself after inspection.
 See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for the prerequisite auth schema.
 
+**Later slice:** Connections/Public feed, radius and manual center are now
+implemented locally. The original preview instructions below describe the sharing
+slice; use [PUBLIC_DISCOVERY_SETUP.md](PUBLIC_DISCOVERY_SETUP.md) for migration 0003
+and the new feed controls. AI/explored/reporting still remain unavailable.
+
 ## 1. Apply the second migration once
 
 After the auth migration `202610070001_pilot_members_connections.sql` has been

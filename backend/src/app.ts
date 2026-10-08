@@ -2,11 +2,37 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import Fastify from 'fastify';
 import type { ServerConfig } from './config.js';
-import { createProfileProvider, type ProfileProvider } from './profile.js';
-import { cleanPhoto, createSpotStore, SpotFailure, toSpot, UUID, validateSpotInput, type SpotStore } from './spots.js';
+import { createProfileProvider, createProfileUpdater, type ProfileProvider, type ProfileUpdater } from './profile.js';
+import { cleanPhoto, createSpotStore, SpotFailure, toSpot, UUID, validateSpotInput, type SpotListOptions, type SpotStore } from './spots.js';
+
+function listOptions(rawUrl: string): SpotListOptions | null {
+  const query = new URL(rawUrl, 'http://localhost').searchParams;
+  if ([...query.keys()].some(key => !['feed', 'centerLat', 'centerLon'].includes(key)) ||
+      query.getAll('feed').length > 1 || query.getAll('centerLat').length > 1 || query.getAll('centerLon').length > 1) return null;
+  const feed = query.get('feed') ?? 'connections';
+  if (feed === 'connections') return query.has('centerLat') || query.has('centerLon') ? null : { feed };
+  if (feed !== 'public' || !query.has('centerLat') || !query.has('centerLon')) return null;
+  const lat = query.get('centerLat')!;
+  const lon = query.get('centerLon')!;
+  const coordinate = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
+  if (!coordinate.test(lat) || !coordinate.test(lon)) return null;
+  const centerLat = Number(lat);
+  const centerLon = Number(lon);
+  return Number.isFinite(centerLat) && centerLat >= -90 && centerLat <= 90 &&
+    Number.isFinite(centerLon) && centerLon >= -180 && centerLon <= 180 ? { feed, centerLat, centerLon } : null;
+}
+
+function radiusBody(raw: unknown): number | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const body = raw as Record<string, unknown>;
+  if (Object.keys(body).length !== 1 || !Object.hasOwn(body, 'publicRadiusKm') ||
+      !Number.isInteger(body.publicRadiusKm) || (body.publicRadiusKm as number) < 1 || (body.publicRadiusKm as number) > 25) return null;
+  return body.publicRadiusKm as number;
+}
 
 export function createApp(config: ServerConfig, profileProvider: ProfileProvider =
-  createProfileProvider(config.supabaseUrl, config.supabasePublishableKey), spotStore: SpotStore = createSpotStore(config)) {
+  createProfileProvider(config.supabaseUrl, config.supabasePublishableKey), spotStore: SpotStore = createSpotStore(config),
+  profileUpdater: ProfileUpdater = createProfileUpdater(config.supabaseUrl, config.supabasePublishableKey)) {
   // Fastify's built-in logger stays off; the response hook below emits only
   // explicitly redacted request metadata.
   const app = Fastify({ logger: false });
@@ -56,6 +82,12 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     return true;
   };
   app.setErrorHandler((error, request, reply) => {
+    if (request.url.split('?')[0] === '/me') {
+      reply.header('Cache-Control', 'private, no-store');
+      const status = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
+      return (status === 400 || status === 415) ? sendError(reply, 400, 'BAD_REQUEST', 'Invalid profile request.')
+        : sendError(reply, 503, 'SERVICE_UNAVAILABLE', 'Profile service is temporarily unavailable. Please retry.');
+    }
     if (request.url.split('?')[0] === '/spots' || request.url.startsWith('/spots/')) {
       reply.header('Cache-Control', 'private, no-store');
       const status = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
@@ -89,11 +121,27 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     return reply.code(503).send({ error: { code: 'SERVICE_UNAVAILABLE', message: 'Profile verification is temporarily unavailable. Please retry.' } });
   });
 
+  app.patch('/me', async (request, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
+    const caller = await verified(request, reply);
+    if (!caller) return;
+    const radius = radiusBody(request.body);
+    if (radius === null) return sendError(reply, 400, 'BAD_REQUEST', 'Invalid public discovery radius.');
+    let result;
+    try { result = await profileUpdater(caller.token, caller.profile.id, radius); }
+    catch { result = { kind: 'unavailable' } as const; }
+    if (result.kind === 'ok') return { profile: result.profile };
+    if (result.kind === 'not_enrolled') return sendError(reply, 403, 'NOT_ENROLLED', 'This account is not enrolled in the pilot.');
+    return sendError(reply, 503, 'SERVICE_UNAVAILABLE', 'Profile service is temporarily unavailable. Please retry.');
+  });
+
   app.get('/spots', async (request, reply) => {
     reply.header('Cache-Control', 'private, no-store');
     const caller = await verified(request, reply);
     if (!caller) return;
-    try { return { spots: (await spotStore.list(caller.token, caller.profile.id)).filter((row) => !row.removed_at).map(toSpot) }; }
+    const options = listOptions(request.raw.url ?? '/spots');
+    if (!options) return sendError(reply, 400, 'BAD_REQUEST', 'Invalid spot feed or center.');
+    try { return { spots: (await spotStore.list(caller.token, caller.profile.id, options)).filter((row) => !row.removed_at).map(toSpot) }; }
     catch (error) { return fail(reply, error); }
   });
   app.get<{ Params: { id: string } }>('/spots/:id', async (request, reply) => {

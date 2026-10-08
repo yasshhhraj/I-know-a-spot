@@ -1,9 +1,7 @@
-# API contract — pilot authentication and spot sharing
+# API contract — pilot authentication, spot sharing and Public discovery
 
-Scope: pilot authentication plus spot creation/viewing and owner corrections.
-The full Connections/Public discovery switch, Public radius endpoint, explored
-records, reports, and AI are separate slices. A Connections-only preview list
-exists to test sharing between the pilot accounts; no radius-free Public feed.
+Scope: pilot authentication, spot creation/viewing/owner corrections, and the
+Public discovery/radius slice. Explored records, reports and AI remain separate.
 
 ## GET /me
 
@@ -105,17 +103,45 @@ and revokes it on unmount/account change. A plain public `<img src>` is not acce
   result may be uncertain. Keep form data, reload list, and ask user to inspect
   whether their spot was saved before explicitly submitting again.
 
-### GET /spots — Connections preview
+### GET /spots — Connections/Public feed
 
-200 `{spots:[Spot...]}`: newest-first active spots by caller and enrolled connected
-authors only, including their public posts, up to 50 for the small pilot. This is
-not global Public discovery. The backend filters authors, not just client cards.
+Request: `Authorization: Bearer <Supabase user access token>`.
+
+- `GET /spots` or `GET /spots?feed=connections`: newest-first active spots by
+  caller and enrolled connected authors only, including their public posts, up to
+  50 for the small pilot. The backend filters authors, not just client cards.
+- `GET /spots?feed=public&centerLat=<lat>&centerLon=<lon>`: active public spots
+  by enrolled authors, including nonconnections, whose destination is within the
+  authenticated caller's saved `public_radius_km`. The center is transient request
+  state and is never persisted or sent to the model. Sort nearest first, newest on
+  ties, then ID descending. Radius filtering is server-side and inclusive.
+- `feed` accepts only `connections` or `public`. Public requires finite
+  `centerLat` in `[-90,90]` and `centerLon` in `[-180,180]`. Missing, malformed,
+  or extra feed values return `400 BAD_REQUEST`; the server never accepts a
+  client-supplied radius or silently widens an empty result.
+
+200 `{spots:[Spot...]}`. Public spots include `distanceKm` (finite nonnegative
+number) for display; Connections spots omit it. Both feeds are capped at 50.
+Connections-only content is never a Public candidate. Direct detail-by-ID remains
+radius-independent for an otherwise authorized active Public spot.
+
+### PATCH /me — saved Public radius
+
+Request: `Authorization: Bearer <Supabase user access token>`, JSON body exactly
+`{"publicRadiusKm":1}` with an integer from 1 through 25.
+
+200 returns the normal `{profile}` shape with the new saved radius and
+`Cache-Control: private, no-store`. The update uses the caller JWT and existing
+RLS, never the server admin credential. Extra/unknown fields, non-integers and
+out-of-range values return `400 BAD_REQUEST`; auth/enrollment/provider errors
+retain the existing 401/403/503 envelope.
 
 ### GET /spots/:id
 
 200 `{spot}` for an active, accessible spot. Owner and enrolled connections may
 read connections-only spots; all enrolled accounts may open public spot details
-by ID. No general Public listing in this slice; future discovery will enforce radius.
+by ID regardless of the current discovery radius. Public listing enforces the
+saved radius; detail authorization remains based on enrollment/audience/removal.
 404 `NOT_FOUND` for unknown/deleted/inaccessible spots without revealing existence.
 
 ### GET /spots/:id/photo
