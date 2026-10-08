@@ -1,8 +1,8 @@
 # API contract — pilot authentication, spot sharing, Public discovery and search
 
 Scope: pilot authentication, spot creation/viewing/owner corrections, Public
-discovery/radius, semantic search and per-user explored state. Reports remain
-separate. Contracts below are agreed for their bounded implementations;
+discovery/radius, semantic search, per-user explored state and private reporting.
+Contracts below are agreed for their bounded implementations;
 implementation/check evidence belongs in WORKBOARD.md.
 
 ## GET /me
@@ -232,6 +232,59 @@ offer explicit Reload state before another change; no blind/automatic retry and 
 claim a snapshot proves an in-flight write failed. Late responses after navigation/
 account changes are discarded. No explored data is sent to MiniLM or changes feeds.
 Migration and direct-user checks: EXPLORED_SETUP.md. Remote execution remains user-run.
+
+### POST /spots/:id/reports — private, deduplicated submission
+
+Verified enrolled caller, current active spot access; Public detail/reporting is
+radius-independent. Exact JSON `{"reason":"private_property"}`, body limit2KiB,
+no query parameters or client reporter/owner IDs. Accepted reasons:
+`private_property`, `sensitive_location`, `inappropriate_content`, `inaccurate`.
+
+200 `{"report":{"spotId":"<requested-uuid>","reason":"private_property","accepted":true}}`
+means an identical own report exists after a successful operation, including a
+duplicate. No duplicate flag, report ID, reporter identity, timestamps, counts,
+queue data or review outcome is exposed. This is not a takedown or a safety verdict.
+
+400 BAD_REQUEST invalid ID/body/content type;401 UNAUTHORIZED;403 NOT_ENROLLED;
+neutral404 NOT_FOUND inaccessible/removed/revoked target;503 SERVICE_UNAVAILABLE
+schema/config/provider failure. All responses private,no-store; safe errors only.
+Caller-JWT spot reads before/after the RPC, including failure/zero-row paths.
+Fresh publishable/JWT client, no admin fallback. RPC derives auth.uid(), checks
+spot_visible and reason, inserts once per reporter/spot/reason atomically, and
+returns only spot_id/reason. A narrowly scoped definer function is needed because
+ordinary roles have NO report-table privileges or policies, including own SELECT.
+
+Frontend35s bounded write, explicit submission, confirmed success only, pending
+disable and scope cancellation. Timeout/network/5xx/malformed success is uncertain;
+explicit retry of the SAME reason is safe because the database unique constraint
+deduplicates it. No automatic retry; another reason is a separate report. Auth
+errors recheck pilot access;404 clears the inaccessible detail. No local persistence.
+
+### Protected operator tooling — local only
+
+No report-list/review/operator-removal HTTP API and no operator role granted by
+pilot enrollment. From backend/, after build, the trusted operator runs:
+`node --env-file-if-exists=.env dist/operator.js list`,
+`... review <report-uuid> --confirm-review`, or
+`... remove <spot-uuid> --confirm-remove`.
+Requires validated existing backend-only privileged credential. Never pass keys
+in arguments, frontend configuration or logs. List shows at most50 pending private
+reports oldest-first (IDs/reason/time/status, not spot notes/coordinates/photos).
+Report IDs and member IDs are private operational output, never public evidence.
+Review marks only one report reviewed; no removal. Removal derives owner from a
+privileged lookup and calls the existing SpotStore.remove tombstone-first path.
+Already tombstoned targets allow explicit cleanup retry; failure never restores
+visibility. Do not label a missing target or uncertain result successful.
+
+Migration0005 seals spot_reports behind RLS with no ordinary grants and an
+authenticated-only empty-search-path submit_spot_report(uuid,text) helper. Status
+is pending/reviewed, unique(reporter_id,spot_id,reason). Spot UUID intentionally
+has no deletion-cascading FK so private review evidence survives physical removal;
+reporter member deletion cascades reports. Review is explicit, not auto-resolved
+by removal. Operators retain only for this pilot and deliberately purge privately
+afterward. Existing spot_visible/Storage/feed/search/explored paths deny tombstones;
+already returned/downloaded content cannot be recalled. CLI cannot evict another
+process's in-memory cache; fresh eligibility checks prevent cached access.
 
 ### GET /spots/:id/photo
 

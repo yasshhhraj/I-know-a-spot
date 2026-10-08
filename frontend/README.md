@@ -1,6 +1,6 @@
 # I Know a Spot — frontend pilot sharing slice
 
-React + TypeScript + Vite mobile web app with Tailwind CSS v4, Leaflet and Supabase Auth. Pre-created pilot accounts can sign in and verify enrollment with `GET /me`. The workspace offers **Connections/Public feeds** (up to 50), a matching map, saved radius/manual center, create/edit/delete, protected photo display, detail by `?spot=<id>`, semantic search, own explored-state control and external directions. Listed live search/radius smoke checks are user-confirmed; broader authorization/browser checks remain pending. Explored requires user-run migration0004 and live persistence checks; reporting remains unavailable. Product requirements are in [../PRD.md](../PRD.md) and the current release plan in [../BUILD_SCOPE_36H.md](../BUILD_SCOPE_36H.md).
+React + TypeScript + Vite mobile web app with Tailwind CSS v4, Leaflet and Supabase Auth. Pre-created pilot accounts can sign in and verify enrollment with `GET /me`. The workspace offers **Connections/Public feeds** (up to 50), a matching map, saved radius/manual center, create/edit/delete, protected photo display, detail by `?spot=<id>`, semantic search, own explored-state control, private reporting and external directions. Listed live search/radius and explored persistence/two-account smoke checks are user-confirmed; broader authorization/browser checks remain pending. Reporting requires user-run migration0005 and live checks. Product requirements are in [../PRD.md](../PRD.md) and the current release plan in [../BUILD_SCOPE_36H.md](../BUILD_SCOPE_36H.md).
 
 ## Local setup
 
@@ -42,10 +42,10 @@ The demo is online-only. Account creation/enrollment and RLS are operator/backen
 
 ## Current build caveat
 
-Latest lead checks: typecheck/build and **46 tests** pass. The enrolled workspace
+Latest lead checks: typecheck/build and **56 tests** pass. The enrolled workspace
 loads through React.lazy/Suspense and a scoped failure boundary; a failed chunk
 offers a deliberate page reload while sign-out remains outside the boundary.
-Build output is426.86 kB entry JS +199.74 kB workspace, with no >500 kB warning.
+Build output is426.97 kB entry JS +205.21 kB workspace, with no >500 kB warning.
 These are build measurements, not verified browser performance. Unicode response
 limits match backend code points; HTML maxLength remains conservative for emoji.
 Use [../SPOT_SHARING_SETUP.md](../SPOT_SHARING_SETUP.md) for the unrun live checks.
@@ -62,6 +62,13 @@ independently on detail, with30s GET/35s PUT budgets and current-member/spot sco
 No optimistic saved state; ambiguous writes require explicit reload before another
 change. State is voluntary/self-reported and not stored in localStorage or passed
 to search. A migration/provider failure does not become false or disable directions.
+
+Reporting control: [../REPORTING_SETUP.md](../REPORTING_SETUP.md). Four fixed reasons,
+explicit submit, private-review explanation and35s bounded POST. No optimistic
+acknowledgement; ambiguous outcomes retain the reason for explicit same-reason
+deduplicated retry. Pending disabled; member/detail/StrictMode scopes suppress late
+success/errors. No local report storage, queue, operator controls or frontend admin
+credential. Node tests are not proof of private SQL persistence or browser layout.
 
 Local production builds with Vite 7.1.9 / Rollup 4.64.1 hung in the optimizer path.
 `vite.config.ts` temporarily disables tree-shaking; typechecking, bundling, CSS,

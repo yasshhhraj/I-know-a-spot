@@ -95,7 +95,7 @@ export default function App() {
         {!configurationError && view.kind === 'enrolled' && <>
           <h2 className="text-xl font-semibold">Welcome, {view.profile.displayName}</h2>
            <p className="mt-3">Pilot membership verified.</p>
-            <p className="mt-3 text-stone-700">Connections, Public discovery and saved radius controls are available. AI search, reports and explored state are not available yet.</p>
+            <p className="mt-3 text-stone-700">The workspace includes Connections and Public discovery, saved radius, semantic search, self-reported explored state and private spot reporting. Availability depends on the configured backend and pilot access; this is not a release-readiness check.</p>
            <button onClick={() => void controller?.signOut()} className="mt-5 min-h-12 rounded-lg border border-stone-600 px-5 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">Sign out</button>
            <WorkspaceBoundary>
              <Suspense fallback={<p role="status" className="mt-8">Loading spot workspace…</p>}>

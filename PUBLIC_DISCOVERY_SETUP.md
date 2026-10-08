@@ -131,5 +131,8 @@ No live migration, browser/Leaflet, true radius-boundary/RLS or phone check is m
 passed. No installation, private env read, model download, deployment or commit was
 performed for that slice. MiniLM search is now implemented and checked locally;
 see SEMANTIC_SEARCH_SETUP.md and SEMANTIC_SEARCH_EVALUATION.md. Current user-reported
-Public/radius results and remaining live audits are in WORKBOARD.md. Explored state,
-reporting and native wrapping remain unimplemented.
+Public/radius results and remaining live audits are in WORKBOARD.md. Explored state
+is implemented with listed persistence/two-account smoke checks user-confirmed;
+see EXPLORED_SETUP.md. Reporting/operator CLI is locally implemented; see
+REPORTING_SETUP.md for user-run migration0005 and live private-queue/removal checks.
+Native wrapping remains unimplemented.

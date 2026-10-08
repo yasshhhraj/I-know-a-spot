@@ -9,8 +9,9 @@ See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) for the prerequisite auth schema.
 implemented locally. The original preview instructions below describe the sharing
 slice; use [PUBLIC_DISCOVERY_SETUP.md](PUBLIC_DISCOVERY_SETUP.md) for migration 0003
 and the new feed controls. MiniLM search is now locally implemented with listed
-live smoke checks user-confirmed; explored state needs user-run migration0004
-(EXPLORED_SETUP.md). Reporting remains unavailable.
+live smoke checks user-confirmed; listed explored persistence/two-account checks
+are user-confirmed (EXPLORED_SETUP.md). Reporting/operator CLI is now locally
+implemented; REPORTING_SETUP.md covers user-run migration0005 and live checks.
 
 ## 1. Apply the second migration once
 

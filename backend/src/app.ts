@@ -5,6 +5,7 @@ import type { ServerConfig } from './config.js';
 import { createLocalEncoder } from './encoder.js';
 import { createExploredStore, type ExploredStore } from './explored.js';
 import { createProfileProvider, createProfileUpdater, type ProfileProvider, type ProfileUpdater } from './profile.js';
+import { createReportStore, reportReason, type ReportStore, type ReportReason } from './reports.js';
 import { createSearchService, SearchDeadline, SearchFailure, type SearchService } from './search.js';
 import { cleanPhoto, createSpotStore, SpotFailure, toSpot, UUID, validateSpotInput, type SpotListOptions, type SpotStore } from './spots.js';
 
@@ -56,12 +57,19 @@ function exploredBody(raw: unknown): boolean | null {
 }
 
 function exploredPath(path: string): boolean { return /^\/spots\/[^/]+\/explored$/.test(path); }
+function reportPath(path: string): boolean { return /^\/spots\/[^/]+\/reports$/.test(path); }
+
+function reportBody(raw: unknown): ReportReason | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const body = raw as Record<string, unknown>;
+  return Object.keys(body).length === 1 && Object.hasOwn(body, 'reason') && reportReason(body.reason) ? body.reason : null;
+}
 
 export function createApp(config: ServerConfig, profileProvider: ProfileProvider =
   createProfileProvider(config.supabaseUrl, config.supabasePublishableKey), spotStore: SpotStore = createSpotStore(config),
   profileUpdater: ProfileUpdater = createProfileUpdater(config.supabaseUrl, config.supabasePublishableKey),
   searchService: SearchService = createSearchService(createLocalEncoder(config)),
-  exploredStore: ExploredStore = createExploredStore(config)) {
+  exploredStore: ExploredStore = createExploredStore(config), reportStore: ReportStore = createReportStore(config)) {
   // Fastify's built-in logger stays off; the response hook below emits only
   // explicitly redacted request metadata.
   const app = Fastify({ logger: false });
@@ -75,7 +83,8 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     // Fastify parses JSON before route handlers. Reject missing/malformed Bearer
     // credentials first even when the request body itself cannot be parsed.
     if (((request.method === 'POST' && request.url.split('?')[0] === '/spots/search') ||
-        (request.method === 'PUT' && exploredPath(request.url.split('?')[0]))) &&
+        (request.method === 'PUT' && exploredPath(request.url.split('?')[0])) ||
+        (request.method === 'POST' && reportPath(request.url.split('?')[0]))) &&
         (typeof request.headers.authorization !== 'string' ||
           !/^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.test(request.headers.authorization))) {
       reply.header('Cache-Control', 'private, no-store');
@@ -126,6 +135,12 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     return true;
   };
   app.setErrorHandler((error, request, reply) => {
+    if (reportPath(request.url.split('?')[0])) {
+      reply.header('Cache-Control', 'private, no-store');
+      const status = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
+      return (status === 400 || status === 413 || status === 415)
+        ? sendError(reply, 400, 'BAD_REQUEST', 'Invalid report request.') : unavailable(reply);
+    }
     if (exploredPath(request.url.split('?')[0])) {
       reply.header('Cache-Control', 'private, no-store');
       const status = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
@@ -259,6 +274,32 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
   }
   app.get<{ Params: { id: string } }>('/spots/:id/explored', async (request, reply) => explored(request, reply, false));
   app.put<{ Params: { id: string } }>('/spots/:id/explored', { bodyLimit: 2048 }, async (request, reply) => explored(request, reply, true));
+  app.post<{ Params: { id: string } }>('/spots/:id/reports', { bodyLimit: 2048 }, async (request, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
+    const caller = await verified(request, reply);
+    if (!caller) return;
+    const id = request.params.id;
+    if (!idOf(id, reply)) return;
+    if ((request.raw.url ?? '').includes('?') || !/^application\/json(?:\s*;|\s*$)/i.test(request.headers['content-type'] ?? ''))
+      return sendError(reply, 400, 'BAD_REQUEST', 'Invalid report request.');
+    const reason = reportBody(request.body);
+    if (!reason) return sendError(reply, 400, 'BAD_REQUEST', 'Invalid report request.');
+    try {
+      const before = await spotStore.get(caller.token, id);
+      if (!before || before.removed_at) return missing(reply);
+      // Re-read with the same caller JWT even on RPC failure or zero rows. A
+      // concurrent revocation wins over an ambiguous provider result.
+      let accepted: boolean | null | undefined;
+      let failed = false;
+      try { accepted = await reportStore.submit(caller.token, id, reason); }
+      catch { failed = true; }
+      const after = await spotStore.get(caller.token, id);
+      if (!after || after.removed_at) return missing(reply);
+      if (accepted === null) return missing(reply);
+      if (failed || accepted !== true) return unavailable(reply);
+      return { report: { spotId: id, reason, accepted: true } };
+    } catch { return unavailable(reply); }
+  });
   app.get<{ Params: { id: string } }>('/spots/:id/photo', async (request, reply) => {
     reply.header('Cache-Control', 'private, no-store').header('X-Content-Type-Options', 'nosniff');
     const caller = await verified(request, reply);

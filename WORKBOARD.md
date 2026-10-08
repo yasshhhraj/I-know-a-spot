@@ -5,8 +5,9 @@ and record actual evidence, not anticipated success. No private payloads here.
 
 ## Current state
 
-Pilot auth/sharing, Connections/Public feed/radius, MiniLM search and explored state
-are implemented with local tests: frontend 46/backend 118 last passed; both typecheck/build. The schema/RLS
+Pilot auth/sharing, Connections/Public feed/radius, MiniLM search, explored state
+and reporting/operator CLI are implemented with local tests: frontend56/backend137
+last passed; both typecheck/build. The schema/RLS
 migrations have not been applied by the assistant. The user reports that live enrolled
 sign-in shows the expected screen and an unenrolled account shows “Not enrolled.”
 The user also confirms refresh/session restoration behaves as expected.
@@ -47,8 +48,10 @@ The user now reports the listed Explored activation/browser checks passed: explo
 and unexplored persist across reopen/reload/sign-in, and another eligible account
 has independent state. Migration activation is covered by that overall workflow
 report; no separate SQL receipts or direct RLS checks were inspected. Broader
-revocation/tombstone/cascade and phone checks remain pending. Reporting and native flows are
-unimplemented. See EXPLORED_SETUP.md, SEMANTIC_SEARCH_SETUP.md and
+revocation/tombstone/cascade and phone checks remain pending. Reporting/operator
+CLI is locally implemented; migration0005/private persistence/queue/removal checks
+remain user-run. Native flows are unimplemented. See REPORTING_SETUP.md,
+EXPLORED_SETUP.md, SEMANTIC_SEARCH_SETUP.md and
 SEMANTIC_SEARCH_EVALUATION.md for actual steps/evidence and limitations.
 Local tests do not prove remote RLS or a finished pilot.
 
@@ -71,7 +74,8 @@ Local tests do not prove remote RLS or a finished pilot.
 | AI-SQL | Search-check seed/cleanup scripts, no embedding migration | Lead; `backend/supabase/seed_semantic_search.sql`, `cleanup_semantic_search.sql`, `SEMANTIC_SEARCH_SETUP.md` | Completed (prepared only) | 14 guarded synthetic fixtures, three existing enrolled accounts, collision/media/marker safeguards; 3 structural tests passed; no PostgreSQL execution or Storage objects |
 | AI-LIVE | Populate optional fixtures and verify real-token search, revocation/radius/phone behavior | User then lead; SEMANTIC_SEARCH_SETUP.md | Partial (user-reported smoke passed) | “How to try it” workflow, listed queries and radius reduction user-confirmed; individual SQL receipts not inspected; direct access/revocation, real-corpus threshold, target resources, phone and exact RPC/RLS boundaries pending |
 | AI-PREP | Download pinned MiniLM and plan integration; no search implementation | Lead plan/verification; backend-builder `backend/scripts/minilm-smoke.mjs` | Completed (local preparation only) | Pinned q8 weight checksum matches HF; synthetic CPU and cache-only checks pass; backend typecheck/build/86 tests pass; plan in `SEMANTIC_SEARCH_PLAN.md` |
-| SAFETY | Reports and protected operator removal | Unassigned; backend/ then frontend/ | Pending | Removed content unavailable through all ordinary access paths |
+| SAFETY | Reports and protected operator removal | Lead contract/SQL/docs; backend-builder src/tests; frontend-builder src/tests | Completed (local only) | 137 backend/56 frontend tests and typecheck/build; private deduplicated RPC, local privileged CLI, simulated warmed-cache/tombstone route checks; migration0005 and live proof pending |
+| SAFETY-LIVE | Apply0005 and test private persistence/queue/removal boundaries | User then lead; REPORTING_SETUP.md | Pending | User applies migration, verifies dedup/ordinary-role denial, privately reviews/removes disposable target; all direct feed/detail/media/search/explored/report paths denied after tombstone |
 | EXPLORED | Per-user self-reported explored state | Lead contract/SQL/docs; backend-builder `backend/src/`, `backend/tests/`; frontend-builder `frontend/src/`, `frontend/tests/` | Completed (local; listed live smoke user-confirmed) | 118 backend/46 frontend tests and typecheck/build pass; user confirms true/false persistence across reopen/reload/sign-in and independent account state; direct SQL/RLS and broader boundaries remain pending |
 | EXPLORED-LIVE | Apply migration0004 and verify persistence, isolation and removal boundaries | User then lead; EXPLORED_SETUP.md | Partial (user-reported quick checks passed) | Listed activation/browser persistence/two-account checks confirmed; no independent SQL receipts, direct table/RPC audit, revocation/tombstone/cascade or phone proof |
 | PILOT | Combined mobile/outdoor test and submission evidence | Lead | Pending | Document actual checks, real outing, limits, and a draft; no unrequested publication |
@@ -374,6 +378,48 @@ Local tests do not prove remote RLS or a finished pilot.
 - Documentation-only update; no code changes or new application test run. Existing
   118 backend/46 frontend results remain the last executed passing checks.
 - Next required implementation: predefined reports and protected operator removal.
+
+### Reporting/operator implementation — October8,2026
+
+- Lead agreed REPORTING_PLAN.md/API_CONTRACT.md before bounded parallel backend
+  and frontend parts. No dashboard, moderation HTTP routes, free text, public
+  reports/counts, automatic removal or new dependencies.
+- Backend src/reports.ts/app.ts: fixed reason allowlist, strict2KiB POST body,
+  fresh publishable/caller-JWT RPC, before/after current spot authorization even
+  failure/no rows, safe private no-store response. Returns only spotId/reason/
+  accepted, no private identifiers/count/duplicate flag. Existing createApp first6
+  injectable parameters retained, ReportStore is seventh.
+- Frontend reportApi/reportController/ReportControl/detail wiring: explicit choice
+  and submission, validated success only,35s deadline, scoped pending disable,
+  late result dismissal/auth/missing callbacks; explicit same-reason retry after
+  uncertain outcome is safe via dedup. No localStorage or operator controls.
+- Local backend/src/operator.ts: validated server-only credential and URL, bounded
+  private pending queue, confirmed single-report review and confirmed spot removal.
+  Derives real owner and delegates existing tombstone-first SpotStore.remove;
+  storage failure leaves hidden target and requires explicit retry. Never executed
+  against real configuration. Queue output is private, not demo evidence.
+- Prepared migration0005: sealed RLS report table with NO ordinary table privileges
+  or policies, fixed-path authenticated-only narrow definer RPC derives auth.uid()
+  and spot_visible, unique reporter/spot/reason. Reviewed duplicate cannot reopen;
+  reports retain spot UUID after removal, reporter member deletion cascades. No SQL
+  applied. Rollback-only check_reporting_boundaries.sql uses4 guarded disposable
+  Auth users, synthetic metadata/no images; structural tests only, not PostgreSQL.
+- Lead commands in both apps: npm run typecheck && npm run build && npm test.
+  Backend11 files/137 tests passed after integrated removal regression; frontend56
+  tests passed, build4.52s, entry426.97kB/workspace205.21kB, no >500kB warning.
+  Existing tree-shaking workaround remains. Simulated caller-RLS route test warms
+  search cache then CLI cleanup fails: subsequent feeds/search empty and detail/
+  photo/explored/report return404, without another encoder/ordinary Storage call.
+  This tests route composition, NOT real Supabase policies or Storage erasure.
+- Real cached MiniLM/injected-HTTP regression:11/11 positive Hit@3 versus7/11
+  keywords, unrelated negative empty. Synthetic corpus/auth, not live retrieval.
+  git diff --check passed. No installs/private env reads/remote SQL/live removal/
+  deployments/commits/publishing. Root/scoped status and setup guides updated.
+- Next: user applies0005 once, report twice with same reason, privately inspect
+  exactly one row, test reporter/owner direct queue denial, then deliberately
+  remove a disposable target and verify all ordinary routes/direct Storage/RLS.
+  REPORTING_SETUP.md contains steps and bounded rollback SQL; phone/outdoor and
+  broader authorization/cleanup/revocation audits still prevent pilot readiness.
 
 ### Template for the next slice
 

@@ -8,6 +8,7 @@ import { asSpot, asSpots, multipart, photoEndpoint, readOwnConnectionSpots, spot
 import { searchQuery, searchSpots, SearchApiError, type SearchResult } from './searchApi'
 import { ScopedResultsController } from './searchController'
 import { ExploredControl } from './ExploredControl'
+import { ReportControl } from './ReportControl'
 
 type Props = { profile: Profile; recheck: () => void }
 const button = 'min-h-12 rounded-lg border border-stone-600 px-4 py-2 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50'
@@ -264,7 +265,7 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
 
   async function open(id: string) {
     const request = ++detailRevision.current
-    if (!spotIdPattern.test(id)) { setDetailStatus('Spot unavailable.'); setMode('detail'); return }
+    if (!spotIdPattern.test(id)) { setDetail(null); setDetailStatus('Spot unavailable.'); setMode('detail'); return }
     setMode('detail'); setDetail(null); setDetailStatus('Loading spot…')
     try {
       const result = await scope.run(profile.id, async () => (await getSupabaseClient().auth.getSession()).data.session, async (token, signal) => asSpot(await spotRequest(apiBaseUrl, token, `/spots/${id}`, signal), apiBaseUrl))
@@ -326,7 +327,7 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
        {(['connections', 'public'] as const).map(value => <button key={value} type="button" aria-pressed={feed === value} className={`${button} border-0 ${feed === value ? 'bg-emerald-800 text-white' : 'bg-white'}`} onClick={() => { if (feed !== value) { resultsController.current.invalidate(); back(); setFeed(value) } }}>{value === 'public' ? 'Public' : 'Connections'}</button>)}
     </div></div>
     <h3 className="mt-4 text-xl font-semibold">{feed === 'public' ? 'Public discoveries' : 'Connections'}</h3>
-      <p className="mt-2 text-sm">{feed === 'public' ? `Public posts within your saved ${settings.publicRadiusKm} km straight-line radius of the ${centerSource === 'pilot' ? 'configured pilot area' : centerSource === 'manual' ? 'chosen manual area' : 'center you choose'}. Distance is approximate, not travel time.` : 'Newest spots from you and your enrolled connections, including their Public posts.'} The server determines eligibility; client display filtering is not authorization. Reporting is not yet available.</p>
+      <p className="mt-2 text-sm">{feed === 'public' ? `Public posts within your saved ${settings.publicRadiusKm} km straight-line radius of the ${centerSource === 'pilot' ? 'configured pilot area' : centerSource === 'manual' ? 'chosen manual area' : 'center you choose'}. Distance is approximate, not travel time.` : 'Newest spots from you and your enrolled connections, including their Public posts.'} The server determines eligibility; client display filtering is not authorization.</p>
     {mode === 'list' && <>
       {feed === 'public' && <div className="mt-4 rounded-lg border border-stone-300 p-3">
         <h4 className="font-semibold">Discovery center</h4>
@@ -373,7 +374,8 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
         <p>Destination: {detail.latitude}, {detail.longitude}</p><SpotMap pin={[detail.latitude, detail.longitude]} />
         <p className="text-sm">Directions open Google Maps outside this app and send it the destination coordinates. No safe route or travel time is verified.</p>
          <a className={`${button} inline-flex items-center`} target="_blank" rel="noopener noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${detail.latitude},${detail.longitude}`)}`}>Open directions (external)</a>
-         <ExploredControl key={`${profile.id}:${detail.id}`} memberId={profile.id} spotId={detail.id} recheck={recheck} onMissing={exploredSpotMissing} />
+          <ExploredControl key={`${profile.id}:${detail.id}`} memberId={profile.id} spotId={detail.id} recheck={recheck} onMissing={exploredSpotMissing} />
+          <ReportControl key={`report:${profile.id}:${detail.id}`} memberId={profile.id} spotId={detail.id} recheck={recheck} onMissing={exploredSpotMissing} />
         {detail.ownerId === profile.id && <div className="flex gap-3"><button className={button} onClick={() => setMode('edit')}>Edit metadata</button><button className={button} disabled={busyDelete} onClick={() => void remove(detail.id)}>{busyDelete ? 'Deleting…' : 'Delete spot'}</button></div>}
       </article>}
     </>}

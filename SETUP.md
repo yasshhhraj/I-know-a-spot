@@ -5,13 +5,14 @@
 - `frontend/`: React/TypeScript/Vite + Tailwind, pilot email/password sign-in,
   session restoration/sign-out, protected profile gate, sharing form, Leaflet pin
   picker, Connections/Public feed/map switch, saved radius/manual discovery center,
-  protected photos, owner edits/deletion, semantic search, private explored control
+  protected photos, owner edits/deletion, semantic search, private explored/report controls
   and directions;
   static-buildable. The sharing workspace is lazy-loaded with a failure boundary.
 - `backend/`: Node/TypeScript/Fastify with `GET /me` verifying caller/enrollment;
   authenticated spot/detail/media and owner create/edit/delete endpoints, Public
   caller-JWT RPC adapter, caller-scoped radius PATCH /me, local MiniLM POST search
-  and own-state GET/PUT explored endpoints;
+  own-state GET/PUT explored and private POST reports endpoints, plus a protected
+  local operator CLI (not an HTTP API);
   `GET /health` still reports `{"status":"scaffold"}`, not service readiness.
 - Supabase migrations are prepared, never executed by the assistant. User-reported
   live auth is partial evidence; direct RLS and spot/Storage setup remain unverified.
@@ -22,8 +23,10 @@
   and browser/phone checks remain pending. MiniLM search is implemented locally and
   compared with keywords on synthetic fixtures; listed live search/radius smoke
   checks are user-confirmed, broader authorization/phone checks remain pending.
-  Explored state is implemented locally but requires new user-run migration0004;
-  see [EXPLORED_SETUP.md](EXPLORED_SETUP.md). Reporting and native app are not implemented. See
+  Listed explored activation/persistence/two-account checks are user-confirmed;
+  see [EXPLORED_SETUP.md](EXPLORED_SETUP.md). Reports/operator CLI are locally
+  implemented and require user-run migration0005 and live private queue/removal
+  checks in [REPORTING_SETUP.md](REPORTING_SETUP.md). Native app is not implemented. See
   [SEMANTIC_SEARCH_SETUP.md](SEMANTIC_SEARCH_SETUP.md) for guarded user-run seed/
   cleanup scripts; no new search migration or embedding backfill is required.
 - `AGENTS.md`, scoped AGENTS files, `.opencode/agents/`, and `WORKBOARD.md` provide
@@ -217,3 +220,16 @@ Prepared `202610080003_public_feed_radius.sql` and rollback-only operator SQL
 boundary script. Neither was executed. Live Public feed/radius, direct RPC grants,
 PostgreSQL distance boundaries and browser map/picker/StrictMode checks are unrun.
 See PUBLIC_DISCOVERY_SETUP.md. No new credentials, dependencies or deployment.
+
+### Reporting/operator implementation — October8,2026
+
+Lead ran `npm run typecheck && npm run build && npm test` in both apps: backend
+11 files/137 tests and frontend56 tests passed. Frontend build4.52s, entry426.97kB,
+workspace205.21kB, no >500kB warning; existing optimizer workaround retained.
+Real cached MiniLM/HTTP synthetic regression remains11/11 positive hits versus7/11
+keywords, unrelated negative empty. No reports enter the encoder.
+Prepared migration0005 and rollback-only direct-role SQL; neither run. See
+REPORTING_SETUP.md for user-run activation, private queue inspection and deliberate
+removal/cleanup. Operator transport tests and simulated RLS route integration are
+local, not a live SQL/Storage/browser audit. No installs/private env reads/live
+SQL/removal/deployment/commit/publication by the assistant.

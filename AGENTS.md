@@ -6,15 +6,16 @@ Read `PRD.md`, `BUILD_SCOPE_36H.md`, and `WORKBOARD.md` before implementation.
 `FUTURE_SCOPE.md` is excluded unless the user explicitly changes scope.
 The release includes Connections/Public feeds, a top-center feed switch, saved
 Public radius, browser photo capture/selection, directions, and explored state.
-Auth/sharing, Connections/Public feed/radius, MiniLM search and explored have local tests.
+Auth/sharing, Connections/Public feed/radius, MiniLM search, explored and reporting have local tests.
 The user reports live auth/sharing/detail audience, core Public/radius, and listed
 semantic-query/radius-reduction smoke checks working. Direct SQL radius/RLS,
 Storage, broader search authorization/revocation and browser/phone checks remain
 pending. Explored's listed activation/persistence/two-account browser checks are
 user-confirmed; direct SQL/RLS, revocation/tombstone/cascade and phone checks remain
-pending. Reporting remains unimplemented. Read API_CONTRACT.md plus
+pending. Reporting/operator CLI is locally implemented; migration0005 and live
+private-persistence/queue/removal checks remain user-run. Read API_CONTRACT.md plus
 SUPABASE_SETUP.md, SPOT_SHARING_SETUP.md, PUBLIC_DISCOVERY_SETUP.md and
-SEMANTIC_SEARCH_SETUP.md and EXPLORED_SETUP.md for user-run external steps. Search uses in-memory vectors;
+SEMANTIC_SEARCH_SETUP.md, EXPLORED_SETUP.md and REPORTING_SETUP.md for user-run external steps. Search uses in-memory vectors;
 prepared SQL seed/cleanup is metadata-only and requires no new search migration;
 never mistake prepared migrations for applied policies.
 

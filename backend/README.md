@@ -7,7 +7,8 @@ provided but **has not been applied by this implementation**. Spot sharing and a
 Connections/Public feeds and saved radius update are implemented locally. Public
 requires migration 0003 and live SQL/RPC verification; local MiniLM semantic search
 is implemented. Own self-reported explored state is implemented locally and needs
-user-run migration0004; reporting remains unimplemented. This is not a
+user-run migration0004. Reporting and local protected operator CLI are implemented
+locally and require migration0005 plus live checks. This is not a
 verified working pilot.
 
 ## Local setup
@@ -205,7 +206,7 @@ do **not** establish that the migration was applied or that remote RLS works.
 
 See [../SPOT_SHARING_SETUP.md](../SPOT_SHARING_SETUP.md) for the operator-run
 migration/configuration, direct API/Storage matrix and cleanup procedure. Latest
-lead checks: typecheck/build and 8 files / 118 tests pass locally; remote checks unrun.
+lead checks: typecheck/build and 11 files / 137 tests pass locally; direct remote audits remain pending.
 
 Public setup: [../PUBLIC_DISCOVERY_SETUP.md](../PUBLIC_DISCOVERY_SETUP.md).
 Apply `202610080003_public_feed_radius.sql` once after 0002. Prepared rollback
@@ -219,8 +220,19 @@ Explored activation: [../EXPLORED_SETUP.md](../EXPLORED_SETUP.md). Apply
 `supabase/migrations/202610080004_spot_explorations.sql` once after0003. Own state
 uses caller JWT/publishable key and a security-invoker boolean setter, not admin
 fallback. No GPS/visit timestamps/public counts. Missing migration is503, not false.
-Local checks now pass: 8 files / 118 tests and typecheck/build; rollback-only SQL/RLS
-script is prepared but not executed. Real persistence and role boundaries remain unverified.
+Listed live persistence/two-account checks are user-confirmed; rollback-only SQL/RLS
+script is prepared but not assistant-executed. Direct role boundaries remain unverified.
+
+Reporting/operator activation: [../REPORTING_SETUP.md](../REPORTING_SETUP.md).
+Apply `supabase/migrations/202610080005_spot_reports.sql` once after0004. Submission
+uses only caller JWT/publishable key and a narrow authenticated definer RPC, with
+no report-table privileges for ordinary users. Unique reporter/spot/reason accepts
+identical retries without extra rows or duplicate flags. Only server-configured
+local `dist/operator.js list|review|remove` commands may inspect/review the private
+queue or remove any spot. Removal derives owner and reuses existing tombstone/media
+cleanup; confirmation flags mandatory. No operator web API or new frontend secret.
+Local tests pass, including warmed-cache/route exclusions under simulated caller
+RLS. Migration/live queue/Storage/removal checks remain user-run, not proven by mocks.
 
 Follow the root `PRD.md` and `BUILD_SCOPE_36H.md` for the pilot. Public discovery
 and search must enforce audience and ownership for direct
