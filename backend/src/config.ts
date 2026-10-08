@@ -8,6 +8,8 @@ export interface ServerConfig {
   supabasePublishableKey?: string;
   supabaseSecretKey?: string;
   supabaseServiceRoleKey?: string;
+  modelId?: string;
+  modelCacheDir?: string;
 }
 
 /** Integration settings are optional at startup so /health remains scaffold-only. */
@@ -49,5 +51,7 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     ...(env.SUPABASE_PUBLISHABLE_KEY ? { supabasePublishableKey: env.SUPABASE_PUBLISHABLE_KEY } : {}),
     ...(env.SUPABASE_SECRET_KEY ? { supabaseSecretKey: env.SUPABASE_SECRET_KEY } : {}),
     ...(env.SUPABASE_SERVICE_ROLE_KEY ? { supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY } : {}),
+    modelId: env.MODEL_ID ?? 'Xenova/all-MiniLM-L6-v2',
+    modelCacheDir: env.MODEL_CACHE_DIR ?? '.cache/models',
   };
 }

@@ -1,7 +1,9 @@
-# API contract — pilot authentication, spot sharing and Public discovery
+# API contract — pilot authentication, spot sharing, Public discovery and search
 
 Scope: pilot authentication, spot creation/viewing/owner corrections, and the
-Public discovery/radius slice. Explored records, reports and AI remain separate.
+Public discovery/radius and semantic-search slices. Explored records and reports
+remain separate. The search contract below is agreed for this implementation;
+implementation/check evidence belongs in WORKBOARD.md.
 
 ## GET /me
 
@@ -124,6 +126,58 @@ Request: `Authorization: Bearer <Supabase user access token>`.
 number) for display; Connections spots omit it. Both feeds are capped at 50.
 Connections-only content is never a Public candidate. Direct detail-by-ID remains
 radius-independent for an otherwise authorized active Public spot.
+
+### POST /spots/search — read-only semantic search
+
+Bearer authentication and enrollment required; JSON body exactly:
+
+```json
+{"query":"somewhere tucked away with interesting textures","feed":"connections"}
+```
+
+Public requires `centerLat` and `centerLon` as finite numbers with the same bounds
+as listing. Connections forbids center fields. No query-string parameters, unknown
+body keys, client radius, owner IDs, candidate IDs or model override. Query is a
+string trimmed for use, at most 200 Unicode code points; body limit 2 KiB. No
+query/body/coordinate/token logging. Request text is not placed in a URL.
+
+200:
+
+```json
+{"mode":"semantic","spots":[],"candidateLimit":50,"emptyReason":"no_matches"}
+```
+
+- `mode: "semantic"` for nonempty queries: up to three existing `Spot` objects,
+  original notes and authorized photo endpoints, Public `distanceKm` preserved.
+- `mode: "browse"` for empty/whitespace queries: ordinary selected feed up to 50,
+  no encoder call. Both paths enforce current caller-JWT feed/audience/removal rules.
+- `candidateLimit` is always 50: search covers the existing newest Connections or
+  nearest Public window, not unlimited history. Public uses the saved radius; no
+  widening to fill results. Empty candidate set requires no encoder invocation.
+- `emptyReason` is present only for an empty list: `no_candidates` or `no_matches`;
+  browse can use only `no_candidates`. Clients explain the selected-feed context.
+- No vectors, scores/confidence percentages, generated explanations or query echo.
+- Semantic ranking receives only eligible title/note text and query; re-read the
+  eligible feed before responding and reject changed text/inaccessible candidates.
+  Cache entries never grant access. Concurrent updates after the final read remain
+  possible, as with ordinary feeds; direct detail/photo always recheck access.
+- All success/errors use `Cache-Control: private, no-store`.
+
+Errors retain the safe envelope: 400 `BAD_REQUEST` (including malformed/oversized/
+wrong-content-type body), 401 `UNAUTHORIZED`, 403 `NOT_ENROLLED`, 503
+`SERVICE_UNAVAILABLE` for upstream auth/feed failures. Search additionally uses
+503 `SEARCH_UNAVAILABLE` for model/processing/overall deadline failure and 429
+`SEARCH_BUSY` for bounded capacity. No automatic retry or save-uncertain messaging:
+POST here is read-only. Frontend search timeout 45s; overall backend deadline 40s,
+inference stage 5s. Timed-out native work holds its capacity permit until settled.
+
+MiniLM is backend-local, pinned q8 CPU, mean pooled and normalized, 256-token cap.
+Derived vectors are bounded in-memory text-version entries, not database records.
+No search migration is required; existing spot rows become searchable on demand.
+Missing weights/failure must not break ordinary browsing, sharing or directions.
+Model setup and actual evaluation are documented in SEMANTIC_SEARCH_PLAN.md and
+SEMANTIC_SEARCH_SETUP.md. Release relevance thresholds require corpus evaluation,
+not an invented probability/confidence interpretation.
 
 ### PATCH /me — saved Public radius
 

@@ -14,6 +14,10 @@ Mobile-web pilot with a later Capacitor path. See [PRD.md](PRD.md), the
   Public feed, saved-radius and manual discovery-area slice.
 - [PUBLIC_DISCOVERY_SETUP.md](PUBLIC_DISCOVERY_SETUP.md): new Public-feed migration,
   manual area/radius setup and user-run live boundary checks.
+- [SEMANTIC_SEARCH_SETUP.md](SEMANTIC_SEARCH_SETUP.md): MiniLM search, guarded
+  searchable-spot SQL fixtures/cleanup and user-run checks; no new search migration.
+- [SEMANTIC_SEARCH_EVALUATION.md](SEMANTIC_SEARCH_EVALUATION.md): actual local
+  MiniLM/HTTP synthetic comparison against keywords, with limits.
 - [API_CONTRACT.md](API_CONTRACT.md): protected profile and spot/media API contract.
 - [frontend/](frontend/): React/TypeScript/Vite app (port 5173).
 - [backend/](backend/): Node/TypeScript/Fastify API (port 3001).
@@ -23,11 +27,14 @@ Mobile-web pilot with a later Capacitor path. See [PRD.md](PRD.md), the
 **Incomplete pilot, locally tested:** auth plus photo/pin/note/audience sharing,
 Connections/Public feed switch and map, saved radius/manual discovery center,
 protected photo retrieval, detail/directions and owner metadata edits/deletion are
-implemented. Both apps typecheck/build; backend 86 tests and frontend 32 tests pass.
+implemented, along with local MiniLM semantic search. Both apps typecheck/build;
+backend 105 tests and frontend 37 tests pass. Actual local synthetic retrieval
+found expected spots for 11/11 positive queries versus 7/11 for simple keywords;
+these are small fixture results, not pilot-corpus or live authorization evidence.
 User reports live auth/sharing, owner/connection photos, deletion and unconnected
-private-denial/Public-detail access working. The new Public-feed migration and
-live radius/RPC/browser checks are pending; direct Storage/security checks remain.
-AI, explored state, reporting and native wrapping are unimplemented. Packages
+private-denial/Public-detail access, Public loading and saved-radius exclusion/
+reload persistence working. Direct SQL/RLS/Storage/security, live search and phone
+checks remain pending. Explored state, reporting and native wrapping are unimplemented. Packages
 were installed by the user. Earlier DevRelay setup below is historical context,
 not proof of application functionality.
 

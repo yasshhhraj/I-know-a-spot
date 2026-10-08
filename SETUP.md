@@ -5,24 +5,29 @@
 - `frontend/`: React/TypeScript/Vite + Tailwind, pilot email/password sign-in,
   session restoration/sign-out, protected profile gate, sharing form, Leaflet pin
   picker, Connections/Public feed/map switch, saved radius/manual discovery center,
-  protected photos, owner edits/deletion and directions;
+  protected photos, owner edits/deletion, semantic-search controls and directions;
   static-buildable. The sharing workspace is lazy-loaded with a failure boundary.
 - `backend/`: Node/TypeScript/Fastify with `GET /me` verifying caller/enrollment;
   authenticated spot/detail/media and owner create/edit/delete endpoints, Public
-  caller-JWT RPC adapter and caller-scoped radius PATCH /me;
+  caller-JWT RPC adapter, caller-scoped radius PATCH /me and local MiniLM POST search;
   `GET /health` still reports `{"status":"scaffold"}`, not service readiness.
 - Supabase migrations are prepared, never executed by the assistant. User-reported
   live auth is partial evidence; direct RLS and spot/Storage setup remain unverified.
   See [SUPABASE_SETUP.md](SUPABASE_SETUP.md),
   [SPOT_SHARING_SETUP.md](SPOT_SHARING_SETUP.md) and
   [PUBLIC_DISCOVERY_SETUP.md](PUBLIC_DISCOVERY_SETUP.md) for user-run steps.
-- Public feed/radius is local-only until its new migration/live checks pass. AI,
-  explored state, reporting and native app are not implemented.
+- User reports Public loading/radius persistence/exclusion working. Direct SQL/RLS
+  and browser/phone checks remain pending. MiniLM search is implemented locally and
+  compared with keywords on synthetic fixtures; live search remains unverified.
+  Explored state, reporting and native app are not implemented. See
+  [SEMANTIC_SEARCH_SETUP.md](SEMANTIC_SEARCH_SETUP.md) for guarded user-run seed/
+  cleanup scripts; no new search migration or embedding backfill is required.
 - `AGENTS.md`, scoped AGENTS files, `.opencode/agents/`, and `WORKBOARD.md` provide
   local agent workflow. Existing DevRelay skills/configuration are preserved.
 
-The assistant did not install packages, download model weights, create/edit real
-env files, apply SQL, provision Supabase, initialize native projects, or deploy.
+The assistant downloaded pinned MiniLM weights only after explicit user approval.
+No package installation, real env file inspection/edit, remote SQL, Supabase
+provisioning, native project initialization or deployment was performed.
 
 ## Runtime
 
@@ -101,9 +106,13 @@ legacy `SUPABASE_SERVICE_ROLE_KEY` JWT. `/me` does not use either privileged key
 Keep keys in correct local configuration; don't send them in chat/commits. Follow
 SPOT_SHARING_SETUP.md before enabling sharing against your project.
 
-Model dependencies include inference tooling, but application code does not load
-or download a model. Model acquisition/revision/license/resource validation is
-a separate explicitly authorized setup step, not silently performed by dev.
+Search lazily loads verified local MiniLM q8 artifacts using `MODEL_ID` and
+`MODEL_CACHE_DIR` (default `.cache/models`, relative to backend/). It never downloads
+in a route. Use `node scripts/minilm-smoke.mjs` to check the existing ignored cache;
+explicit `--download` prepares missing pinned artifacts. Missing/model failure
+returns honest search unavailability without blocking ordinary browsing/sharing.
+See SEMANTIC_SEARCH_SETUP.md and SEMANTIC_SEARCH_EVALUATION.md for setup, limits and
+the actual synthetic comparison. Search deadline is separate from mutation timing.
 
 ## Phone testing later
 

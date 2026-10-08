@@ -5,8 +5,8 @@ Node.js + TypeScript + Fastify. `GET /health` still returns
 Supabase user token and reads that user's pre-enrolled profile. A migration is
 provided but **has not been applied by this implementation**. Spot sharing and a
 Connections/Public feeds and saved radius update are implemented locally. Public
-requires migration 0003 and live SQL/RPC verification; semantic search, explored
-state and reporting are separate unimplemented slices. This is not a
+requires migration 0003 and live SQL/RPC verification; local MiniLM semantic search
+is implemented. Explored state and reporting remain unimplemented. This is not a
 verified working pilot.
 
 ## Local setup
@@ -39,8 +39,22 @@ Do not supply user tokens or expose either admin key to the browser. Config is
 shape-checked locally and validated by Supabase upon use; a missing/invalid admin
 key yields 503 for mutations without blocking `/me` or configured reads. `MODEL_ID`
 defaults in the example to `Xenova/all-MiniLM-L6-v2` and `MODEL_CACHE_DIR` to
-`.cache/models`, but neither is read, loaded, or downloaded yet. Confirm the
-model's exact revision/license and runtime before implementing inference.
+`.cache/models`; both are now read by the API. MiniLM's pinned q8 weights were
+downloaded and real synthetic CPU/HTTP search was verified locally. Search uses
+caller-JWT eligible candidates before ranking, then fresh eligibility/text-version
+revalidation. See [../SEMANTIC_SEARCH_SETUP.md](../SEMANTIC_SEARCH_SETUP.md) for
+local setup, fixture SQL/cleanup, errors and live checks, and
+[../SEMANTIC_SEARCH_EVALUATION.md](../SEMANTIC_SEARCH_EVALUATION.md) for measurements.
+
+From `backend/`, `node scripts/minilm-smoke.mjs` checks the existing local model
+artifacts and synthetic inference without model networking. The explicit
+`node scripts/minilm-smoke.mjs --download` prepares missing pinned artifacts first.
+The ignored cache is `backend/.cache/models`; weights are not shipped in git or
+frontend assets. This is a model smoke check, not an authenticated-search test.
+After building, `node scripts/evaluate-semantic-search.mjs` runs the real route/
+encoder against synthetic auth/candidates, not a real Supabase session. No new
+search migration is required: existing rows are encoded on demand into bounded
+memory. Seed/cleanup SQL commits fictional metadata only; missing photos are expected.
 
 ## Checks (after installing dependencies)
 
@@ -190,7 +204,7 @@ do **not** establish that the migration was applied or that remote RLS works.
 
 See [../SPOT_SHARING_SETUP.md](../SPOT_SHARING_SETUP.md) for the operator-run
 migration/configuration, direct API/Storage matrix and cleanup procedure. Latest
-lead checks: typecheck/build and 4 files / 86 tests pass locally; remote checks unrun.
+lead checks: typecheck/build and 6 files / 105 tests pass locally; remote checks unrun.
 
 Public setup: [../PUBLIC_DISCOVERY_SETUP.md](../PUBLIC_DISCOVERY_SETUP.md).
 Apply `202610080003_public_feed_radius.sql` once after 0002. Prepared rollback
@@ -198,10 +212,10 @@ boundary script tests SQL, not media, and has not been executed. PATCH /me accep
 only caller's integer publicRadiusKm 1–25, using caller JWT and existing RLS;
 no privileged read/update fallback. Public detail-by-ID remains radius-independent.
 
-## Future boundaries
+## Security boundaries
 
-Follow the root `PRD.md` and `BUILD_SCOPE_36H.md` for the pilot. Before enabling
-future Public discovery or search, enforce audience and ownership for direct
+Follow the root `PRD.md` and `BUILD_SCOPE_36H.md` for the pilot. Public discovery
+and search must enforce audience and ownership for direct
 reads, media and writes on the server. A CORS header is not authorization. Do
 not claim live Supabase row-level security until policies are applied and tested.
 Public discovery uses the member's saved radius and explicit request center;

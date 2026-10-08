@@ -2,7 +2,9 @@ import cors from '@fastify/cors';
 import multipart from '@fastify/multipart';
 import Fastify from 'fastify';
 import type { ServerConfig } from './config.js';
+import { createLocalEncoder } from './encoder.js';
 import { createProfileProvider, createProfileUpdater, type ProfileProvider, type ProfileUpdater } from './profile.js';
+import { createSearchService, SearchDeadline, SearchFailure, type SearchService } from './search.js';
 import { cleanPhoto, createSpotStore, SpotFailure, toSpot, UUID, validateSpotInput, type SpotListOptions, type SpotStore } from './spots.js';
 
 function listOptions(rawUrl: string): SpotListOptions | null {
@@ -30,17 +32,44 @@ function radiusBody(raw: unknown): number | null {
   return body.publicRadiusKm as number;
 }
 
+function searchBody(raw: unknown): { query: string; options: SpotListOptions } | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
+  const body = raw as Record<string, unknown>;
+  if (typeof body.query !== 'string' || typeof body.feed !== 'string') return null;
+  const query = body.query.trim();
+  if ([...query].length > 200) return null;
+  if (body.feed === 'connections' && Object.keys(body).length === 2 &&
+      Object.keys(body).every(key => key === 'query' || key === 'feed')) return { query, options: { feed: 'connections' } };
+  if (body.feed !== 'public' || Object.keys(body).length !== 4 ||
+      Object.keys(body).some(key => !['query', 'feed', 'centerLat', 'centerLon'].includes(key))) return null;
+  const lat = body.centerLat, lon = body.centerLon;
+  if (typeof lat !== 'number' || !Number.isFinite(lat) || lat < -90 || lat > 90 ||
+      typeof lon !== 'number' || !Number.isFinite(lon) || lon < -180 || lon > 180) return null;
+  return { query, options: { feed: 'public', centerLat: lat, centerLon: lon } };
+}
+
 export function createApp(config: ServerConfig, profileProvider: ProfileProvider =
   createProfileProvider(config.supabaseUrl, config.supabasePublishableKey), spotStore: SpotStore = createSpotStore(config),
-  profileUpdater: ProfileUpdater = createProfileUpdater(config.supabaseUrl, config.supabasePublishableKey)) {
+  profileUpdater: ProfileUpdater = createProfileUpdater(config.supabaseUrl, config.supabasePublishableKey),
+  searchService: SearchService = createSearchService(createLocalEncoder(config))) {
   // Fastify's built-in logger stays off; the response hook below emits only
   // explicitly redacted request metadata.
   const app = Fastify({ logger: false });
   const requestStarted = new WeakMap<object, number>();
+  const searchDeadlines = new WeakMap<object, SearchDeadline>();
   // Deliberately log only safe response metadata. Never log headers, tokens,
   // request bodies, multipart fields, photo bytes, coordinates or query strings.
-  app.addHook('onRequest', async request => {
+  app.addHook('onRequest', async (request, reply) => {
     requestStarted.set(request, Date.now());
+    if (request.method === 'POST' && request.url.split('?')[0] === '/spots/search') searchDeadlines.set(request, new SearchDeadline());
+    // Fastify parses JSON before route handlers. Reject missing/malformed Bearer
+    // credentials first even when the request body itself cannot be parsed.
+    if (request.method === 'POST' && request.url.split('?')[0] === '/spots/search' &&
+        (typeof request.headers.authorization !== 'string' ||
+          !/^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.test(request.headers.authorization))) {
+      reply.header('Cache-Control', 'private, no-store');
+      return sendError(reply, 401, 'UNAUTHORIZED', 'Sign in to continue.');
+    }
   });
   app.addHook('onResponse', async (request, reply) => {
     const route = request.routeOptions.url ?? request.url.split('?')[0];
@@ -64,11 +93,15 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     reply.code(status).send({ error: { code, message } });
   const unavailable = (reply: Parameters<typeof sendError>[0]) => sendError(reply, 503, 'SERVICE_UNAVAILABLE', 'Spot service is temporarily unavailable. Please retry.');
   const missing = (reply: Parameters<typeof sendError>[0]) => sendError(reply, 404, 'NOT_FOUND', 'Spot unavailable.');
-  async function verified(request: { headers: { authorization?: string } }, reply: Parameters<typeof sendError>[0]) {
+  async function verified(request: { headers: { authorization?: string } }, reply: Parameters<typeof sendError>[0], deadline?: SearchDeadline) {
     const match = typeof request.headers.authorization === 'string' && /^Bearer ([A-Za-z0-9\-._~+/]+=*)$/i.exec(request.headers.authorization);
     if (!match) { sendError(reply, 401, 'UNAUTHORIZED', 'Sign in to continue.'); return null; }
     let result;
-    try { result = await profileProvider(match[1]); } catch { result = { kind: 'unavailable' } as const; }
+    try { result = deadline ? await deadline.run(profileProvider(match[1])) : await profileProvider(match[1]); }
+    catch (error) {
+      if (error instanceof SearchFailure) { sendError(reply, 503, 'SEARCH_UNAVAILABLE', 'Search is temporarily unavailable. Please retry.'); return null; }
+      result = { kind: 'unavailable' } as const;
+    }
     if (result.kind === 'ok') return { token: match[1], profile: result.profile };
     if (result.kind === 'unauthorized') sendError(reply, 401, 'UNAUTHORIZED', 'Sign in to continue.');
     else if (result.kind === 'not_enrolled') sendError(reply, 403, 'NOT_ENROLLED', 'This account is not enrolled in the pilot.');
@@ -82,6 +115,12 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     return true;
   };
   app.setErrorHandler((error, request, reply) => {
+    if (request.url.split('?')[0] === '/spots/search') {
+      reply.header('Cache-Control', 'private, no-store');
+      const status = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
+      return (status === 400 || status === 413 || status === 415)
+        ? sendError(reply, 400, 'BAD_REQUEST', 'Invalid search request.') : unavailable(reply);
+    }
     if (request.url.split('?')[0] === '/me') {
       reply.header('Cache-Control', 'private, no-store');
       const status = error && typeof error === 'object' && 'statusCode' in error ? error.statusCode : undefined;
@@ -143,6 +182,25 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     if (!options) return sendError(reply, 400, 'BAD_REQUEST', 'Invalid spot feed or center.');
     try { return { spots: (await spotStore.list(caller.token, caller.profile.id, options)).filter((row) => !row.removed_at).map(toSpot) }; }
     catch (error) { return fail(reply, error); }
+  });
+  app.post('/spots/search', { bodyLimit: 2048 }, async (request, reply) => {
+    reply.header('Cache-Control', 'private, no-store');
+    const deadline = searchDeadlines.get(request)!;
+    const caller = await verified(request, reply, deadline);
+    if (!caller) return;
+    if ((request.raw.url ?? '').includes('?') || !/^application\/json(?:\s*;|\s*$)/i.test(request.headers['content-type'] ?? ''))
+      return sendError(reply, 400, 'BAD_REQUEST', 'Invalid search request.');
+    const parsed = searchBody(request.body);
+    if (!parsed) return sendError(reply, 400, 'BAD_REQUEST', 'Invalid search request.');
+    try { return await searchService.search(spotStore, caller.token, caller.profile.id, parsed.options, parsed.query, deadline, caller.profile.publicRadiusKm); }
+    catch (error) {
+      if (error instanceof SearchFailure) {
+        const busy = error.code === 'SEARCH_BUSY';
+        return sendError(reply, busy ? 429 : 503, error.code, busy ? 'Search is busy. Please retry.' :
+          error.code === 'SERVICE_UNAVAILABLE' ? 'Spot service is temporarily unavailable. Please retry.' : 'Search is temporarily unavailable. Please retry.');
+      }
+      return sendError(reply, 503, 'SEARCH_UNAVAILABLE', 'Search is temporarily unavailable. Please retry.');
+    }
   });
   app.get<{ Params: { id: string } }>('/spots/:id', async (request, reply) => {
     reply.header('Cache-Control', 'private, no-store');
@@ -209,8 +267,9 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     if (!idOf(request.params.id, reply)) return;
     const input = validateSpotInput(request.body);
     if (!input) return sendError(reply, 400, 'BAD_REQUEST', 'Invalid spot data.');
-    try { const row = await spotStore.update(caller.profile.id, request.params.id, input); return row ? { spot: toSpot(row) } : missing(reply); }
-    catch (error) { return fail(reply, error); }
+    try { const row = await spotStore.update(caller.profile.id, request.params.id, input); if (row) searchService.invalidate(row.id); return row ? { spot: toSpot(row) } : missing(reply); }
+    // An ambiguous write might have committed. Evict derived text anyway.
+    catch (error) { searchService.invalidate(request.params.id); return fail(reply, error); }
   });
   app.delete<{ Params: { id: string } }>('/spots/:id', async (request, reply) => {
     reply.header('Cache-Control', 'private, no-store');
@@ -219,7 +278,10 @@ export function createApp(config: ServerConfig, profileProvider: ProfileProvider
     if (!idOf(request.params.id, reply)) return;
     try { return await spotStore.remove(caller.profile.id, request.params.id) === 'deleted' ? reply.code(204).send() : missing(reply); }
     catch (error) { return fail(reply, error); }
+    finally { searchService.invalidate(request.params.id); }
   });
+
+  app.addHook('onClose', async () => { await searchService.dispose(); });
 
   return app;
 }

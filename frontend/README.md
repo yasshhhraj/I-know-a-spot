@@ -1,6 +1,6 @@
 # I Know a Spot — frontend pilot sharing slice
 
-React + TypeScript + Vite mobile web app with Tailwind CSS v4, Leaflet and Supabase Auth. Pre-created pilot accounts can sign in and verify enrollment with `GET /me`. The workspace offers **Connections/Public feeds** (up to 50), a matching map, saved radius/manual center, create/edit/delete, protected photo display, detail by `?spot=<id>`, and external directions. Public feed/radius requires its separate migration and live verification; AI search, explored state and reporting remain unavailable. Product requirements are in [../PRD.md](../PRD.md) and the current release plan in [../BUILD_SCOPE_36H.md](../BUILD_SCOPE_36H.md).
+React + TypeScript + Vite mobile web app with Tailwind CSS v4, Leaflet and Supabase Auth. Pre-created pilot accounts can sign in and verify enrollment with `GET /me`. The workspace offers **Connections/Public feeds** (up to 50), a matching map, saved radius/manual center, create/edit/delete, protected photo display, detail by `?spot=<id>`, semantic search and external directions. Public feed/radius requires its separate migration and live verification; search is locally implemented with real MiniLM synthetic checks, not yet browser/live verified. Explored state and reporting remain unavailable. Product requirements are in [../PRD.md](../PRD.md) and the current release plan in [../BUILD_SCOPE_36H.md](../BUILD_SCOPE_36H.md).
 
 ## Local setup
 
@@ -36,15 +36,16 @@ npm run preview
 - The form requires a chosen map pin (no default location), title/note/access confirmation and one photo on creation. Numeric latitude/longitude inputs provide a keyboard path if tiles or map interaction fail. Camera capture is a separate browser file input where supported; the ordinary picker remains available. Client type/size checks are hints: the server validates image bytes, dimensions, animation and strips EXIF before storing a clean derivative. Existing photos cannot be replaced through edit in this slice.
 - POST uses multipart `data` JSON plus `photo`; PATCH sends the full metadata object as JSON without a photo. Failed forms retain inputs in that screen session. On uncertain timeout/network writes the app does not retry automatically; check the refreshed preview and open possible matches before explicitly resubmitting. DELETE 204 removes the item; `MEDIA_CLEANUP_PENDING` hides it and offers an explicit deletion retry, **not** a claim that photo bytes are gone. A deleted photo already downloaded by another device cannot be recalled.
 - Reads use a 15-second browser deadline; POST/PATCH/DELETE mutations use a bounded 35-second deadline because backend verification and ordered Storage/database work can exceed 15 seconds. A timeout still leaves the outcome unknown; a deployed proxy or provider can impose another deadline. No automatic retry is performed.
+- Search uses a separate read-only POST helper with a 45-second deadline, not mutation-uncertainty messaging. Explicit Find spots submits a draft; Clear restores browsing. Cards/pins share the returned semantic array (up to three), original notes only. Submitted query is scoped to account/feed/confirmed center/saved radius/refresh; stale successes AND errors are ignored, including StrictMode replay. Busy/unavailable/no-candidates/no-matches states stay distinct. Model weights/dependencies do not enter the frontend bundle. See [../SEMANTIC_SEARCH_SETUP.md](../SEMANTIC_SEARCH_SETUP.md) for synthetic fixture SQL/cleanup and live checks.
 
 The demo is online-only. Account creation/enrollment and RLS are operator/backend responsibilities. Prepared SQL/storage migrations are not proof of deployed policies: the operator must apply them, configure the backend-only admin secret privately, and complete three-account connected/unconnected + signed-out direct API/media checks. Node tests/typecheck/build do not verify a running backend, a real browser/phone camera, Sharp's emitted image bytes, Storage policies, external tiles/directions, or a deployed Capacitor origin. Test selection and capture on pilot phones, then verify save/read/edit/delete and audience revocation live. Native Capacitor packaging and login-origin behavior remain later steps.
 
 ## Current build caveat
 
-Latest lead checks: typecheck/build and **32 tests** pass. The enrolled workspace
+Latest lead checks: typecheck/build and **37 tests** pass. The enrolled workspace
 loads through React.lazy/Suspense and a scoped failure boundary; a failed chunk
 offers a deliberate page reload while sign-out remains outside the boundary.
-Build output is 426.86 kB entry JS + 188.47 kB workspace, with no >500 kB warning.
+Build output is 426.86 kB entry JS + 194.11 kB workspace, with no >500 kB warning.
 These are build measurements, not verified browser performance. Unicode response
 limits match backend code points; HTML maxLength remains conservative for emoji.
 Use [../SPOT_SHARING_SETUP.md](../SPOT_SHARING_SETUP.md) for the unrun live checks.

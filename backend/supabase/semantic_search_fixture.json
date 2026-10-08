@@ -1,0 +1,34 @@
+{
+  "marker": "SYNTHETIC SEARCH FIXTURE v1 - Not a real destination. No photo uploaded.",
+  "center": { "latitude": 0, "longitude": 0 },
+  "spots": [
+    { "key": "garden", "id": "7a110000-0000-4000-8000-000000000001", "title": "Synthetic shaded garden", "note": "A leafy canopy keeps a bench cool. A calm corner for reading and resting beneath trees.", "owner": "connected", "audience": "public", "distanceKm": 0.1 },
+    { "key": "doorway", "id": "7a110000-0000-4000-8000-000000000002", "title": "Synthetic carved doorway", "note": "An old entrance decorated with carved stone, ornate reliefs and interesting textures, visible from the pavement.", "owner": "connected", "audience": "public", "distanceKm": 0.2 },
+    { "key": "stairs", "id": "7a110000-0000-4000-8000-000000000003", "title": "Synthetic colorful staircase", "note": "A staircase painted in vivid rainbow colors. Its geometric patterns make a striking photograph.", "owner": "connected", "audience": "public", "distanceKm": 0.3 },
+    { "key": "river", "id": "7a110000-0000-4000-8000-000000000004", "title": "Synthetic riverside seat", "note": "A bench beside flowing water, where ripples and the river current are easy to notice.", "owner": "connected", "audience": "public", "distanceKm": 2.4 },
+    { "key": "flowers", "id": "7a110000-0000-4000-8000-000000000005", "title": "Synthetic wildflower patch", "note": "A small patch of blossoms with bees and butterflies among the petals. Observe without picking anything.", "owner": "connected", "audience": "public", "distanceKm": 0.5 },
+    { "key": "court", "id": "7a110000-0000-4000-8000-000000000006", "title": "Synthetic basketball court", "note": "An open basketball court with painted lines, two baskets and space for a friendly game.", "owner": "connected", "audience": "public", "distanceKm": 0.6 },
+    { "key": "sunset", "id": "7a110000-0000-4000-8000-000000000007", "title": "Synthetic sunset terrace", "note": "An open terrace faces west. A small spot to see evening colors spread across the sky.", "owner": "connected", "audience": "public", "distanceKm": 0.7 },
+    { "key": "meadow", "id": "7a110000-0000-4000-8000-000000000008", "title": "Synthetic grassy meadow", "note": "A broad grassy clearing with room to spread a blanket, share snacks and relax outdoors.", "owner": "connected", "audience": "public", "distanceKm": 0.8 },
+    { "key": "pond", "id": "7a110000-0000-4000-8000-000000000009", "title": "Synthetic duck pond", "note": "Still water reflects the trees. Ducks paddle between reeds along the edge of this small pond.", "owner": "connected", "audience": "public", "distanceKm": 4.5 },
+    { "key": "private_arch", "id": "7a110000-0000-4000-8000-000000000010", "title": "Synthetic connections-only brick arch", "note": "A weathered brick archway with patterned masonry. This post is shared only with connections.", "owner": "connected", "audience": "connections", "distanceKm": 0.25 },
+    { "key": "mural", "id": "7a110000-0000-4000-8000-000000000011", "title": "Synthetic neighborhood mural", "note": "A painted wall full of bold shapes and street art. The artwork is visible from the sidewalk.", "owner": "unconnected", "audience": "public", "distanceKm": 0.35 },
+    { "key": "hidden_garden", "id": "7a110000-0000-4000-8000-000000000012", "title": "Synthetic inaccessible reading garden", "note": "A quiet shaded garden with a bench for reading under trees.", "owner": "unconnected", "audience": "connections", "distanceKm": 0.15 },
+    { "key": "removed_garden", "id": "7a110000-0000-4000-8000-000000000013", "title": "Synthetic removed reading garden", "note": "A quiet shaded garden with a bench for reading under trees.", "owner": "connected", "audience": "public", "distanceKm": 0.15, "removed": true },
+    { "key": "far_garden", "id": "7a110000-0000-4000-8000-000000000014", "title": "Synthetic distant reading garden", "note": "A quiet shaded garden with a bench for reading under trees.", "owner": "unconnected", "audience": "public", "distanceKm": 26 }
+  ],
+  "queries": [
+    { "query": "somewhere to sit with a novel away from sunshine", "feed": "public", "expected": ["garden"], "vocabularyGap": true },
+    { "query": "elaborate masonry by an entrance", "feed": "public", "expected": ["doorway"], "vocabularyGap": true },
+    { "query": "bright steps for taking pictures", "feed": "public", "expected": ["stairs"], "vocabularyGap": true },
+    { "query": "a place beside moving water", "feed": "public", "expected": ["river"] },
+    { "query": "watch pollinators visiting blooms", "feed": "public", "expected": ["flowers"], "vocabularyGap": true },
+    { "query": "an outdoor game with hoops", "feed": "public", "expected": ["court"] },
+    { "query": "watch the horizon as daylight fades", "feed": "public", "expected": ["sunset"], "vocabularyGap": true },
+    { "query": "put down a picnic blanket", "feed": "public", "expected": ["meadow"] },
+    { "query": "birds swimming on still water", "feed": "public", "expected": ["pond"] },
+    { "query": "paintings directly on a wall", "feed": "public", "expected": ["mural"] },
+    { "query": "weathered brick archway", "feed": "connections", "expected": ["private_arch"] },
+    { "query": "a shop selling replacement laptop batteries", "feed": "public", "expected": [] }
+  ]
+}

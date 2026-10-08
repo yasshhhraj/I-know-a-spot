@@ -5,8 +5,8 @@ and record actual evidence, not anticipated success. No private payloads here.
 
 ## Current state
 
-Pilot auth/sharing and Connections/Public feed/radius are implemented with local tests:
-frontend 32 tests and backend 86 tests last passed; both typecheck/build. The schema/RLS
+Pilot auth/sharing, Connections/Public feed/radius and MiniLM search are implemented
+with local tests: frontend 37 tests and backend 105 tests last passed; both typecheck/build. The schema/RLS
 migrations have not been applied by the assistant. The user reports that live enrolled
 sign-in shows the expected screen and an unenrolled account shows “Not enrolled.”
 The user also confirms refresh/session restoration behaves as expected.
@@ -34,7 +34,17 @@ successfully in the Public feed. The user confirms radius changes and reload
 persistence work. Reducing the radius excludes the tested Public spot from the
 list while its copied ID URL still opens, matching radius-independent detail access.
 Exact inside/on/outside boundaries and the direct RPC/RLS audit remain pending.
-AI, explored, reporting and native flows are unimplemented.
+MiniLM q8 weights are in the ignored backend cache; real local CPU/injected-HTTP
+search passed a 12-query synthetic comparison (11/11 positive Hit@3 versus 7/11
+keywords, one unrelated negative rejected). The user now reports all checks in the
+final “How to try it” section passed: the listed live semantic queries and saved
+radius 5-to-1 km pond exclusion behaved as expected. This is user-reported browser
+smoke evidence, not independent SQL/RLS or media verification. The seed/cleanup
+workflow is covered by that overall report, without separately inspected SQL
+receipts. Broader direct search authorization/revocation, phone testing and actual
+pilot-corpus quality remain pending. No search migration is needed.
+Explored, reporting and native flows are unimplemented. See SEMANTIC_SEARCH_SETUP.md
+and SEMANTIC_SEARCH_EVALUATION.md for actual steps/evidence and limitations.
 Local tests do not prove remote RLS or a finished pilot.
 
 | ID | Slice | Owner / paths | State | Dependency / acceptance evidence |
@@ -52,7 +62,10 @@ Local tests do not prove remote RLS or a finished pilot.
 | SHARE-LIVE | Apply spot/storage migration and test connected/unconnected access | User then lead | Partial (user-reported live flow) | Owner/connection photos load; owner controls and deletion work; unconnected account denied Connections-only detail and allowed Public detail by ID; direct mutation/Storage checks and audience revocation pending |
 | FEEDS | Shared Connections/Public feed/map, Profile radius/area | Lead contract/integration; backend-builder `backend/`; frontend-builder `frontend/` | Completed (local only) | Lead typecheck/build: backend 86 tests, frontend 32 tests pass; SQL RPC/script prepared, no live execution |
 | FEEDS-LIVE | Public migration and real radius/RPC/browser tests | User then lead; PUBLIC_DISCOVERY_SETUP.md | Partial (user-reported core flow passed) | Public load, radius change/reload persistence and out-of-radius list exclusion with ID detail access confirmed; exact boundary, list/map agreement and direct RPC/RLS checks pending |
-| AI | Real open-weight encoder and feed-scoped search | Unassigned; backend/ then frontend/ | Pending | Hour-2 inference gate; keyword comparison and failure handling |
+| AI | Real open-weight encoder and feed-scoped search | Lead integration/docs; backend-builder `backend/src/`, `backend/tests/`; frontend-builder `frontend/src/`, `frontend/tests/` | Completed (local; live smoke user-confirmed) | Backend 105/frontend 37 tests and real 12-query synthetic comparison passed; user confirms listed live queries and 5-to-1 km pond exclusion; broader direct authorization/revocation/mobile checks pending |
+| AI-SQL | Search-check seed/cleanup scripts, no embedding migration | Lead; `backend/supabase/seed_semantic_search.sql`, `cleanup_semantic_search.sql`, `SEMANTIC_SEARCH_SETUP.md` | Completed (prepared only) | 14 guarded synthetic fixtures, three existing enrolled accounts, collision/media/marker safeguards; 3 structural tests passed; no PostgreSQL execution or Storage objects |
+| AI-LIVE | Populate optional fixtures and verify real-token search, revocation/radius/phone behavior | User then lead; SEMANTIC_SEARCH_SETUP.md | Partial (user-reported smoke passed) | “How to try it” workflow, listed queries and radius reduction user-confirmed; individual SQL receipts not inspected; direct access/revocation, real-corpus threshold, target resources, phone and exact RPC/RLS boundaries pending |
+| AI-PREP | Download pinned MiniLM and plan integration; no search implementation | Lead plan/verification; backend-builder `backend/scripts/minilm-smoke.mjs` | Completed (local preparation only) | Pinned q8 weight checksum matches HF; synthetic CPU and cache-only checks pass; backend typecheck/build/86 tests pass; plan in `SEMANTIC_SEARCH_PLAN.md` |
 | SAFETY | Reports and protected operator removal | Unassigned; backend/ then frontend/ | Pending | Removed content unavailable through all ordinary access paths |
 | PILOT | Combined mobile/outdoor test and submission evidence | Lead | Pending | Document actual checks, real outing, limits, and a draft; no unrequested publication |
 
@@ -217,6 +230,93 @@ Local tests do not prove remote RLS or a finished pilot.
 - Next: user applies 0003 once, tests Public with a confirmed area near the existing
   unconnected author's Public spot, saves/reloads radius, then boundary/revocation
   matrix. No installs/private env reads/SQL execution/deployment/commits by assistant.
+
+### MiniLM preparation — October 8, 2026
+
+- User authorized MiniLM weights and integration planning, not search implementation.
+- Backend-builder prepared `backend/scripts/minilm-smoke.mjs`; lead reviewed and
+  fixed runtime preflight/revision handling, token cap and artifact verification.
+- Model: `Xenova/all-MiniLM-L6-v2`, pinned revision
+  `751bff37182d3f1213fa05d7196b954e230abad9`, Apache-2.0, q8 CPU, 384 dimensions,
+  mean pooling and normalization, 256-token cap. About 23 MiB total ignored cache.
+  Weight SHA-256 matches the public Hugging Face LFS metadata. No private env read,
+  application data inference, dependency changes, SQL execution, deployment or commit.
+- Actual commands from `backend/`: `node scripts/minilm-smoke.mjs --download`, then
+  `node scripts/minilm-smoke.mjs` with remote model fetches disabled. Synthetic
+  vectors finite/normalized/repeatable; shaded garden ranks first; five artifact
+  checksums and long-input truncation pass. Original download completed before a
+  tokenizer setter bug was fixed; rerun's preparation time is not network latency.
+- Installed Transformers.js 4.3.1's pipeline/tokenizer preflights ignored revision
+  options; strict guard rejected `main` requests. Explicit pinned artifact download
+  plus absolute local-directory loaders resolves this without library modifications.
+- Latest local-only check: load 285.791 ms, first embedding 21.546 ms, warm median
+  of five 7.366 ms; RSS 92.08 MiB before / 165.54 MiB after. Reported high-water
+  mark 687.285 MiB already existed before loading; not attributable to model usage.
+  These are synthetic smoke observations, not target-host or full-route benchmarks.
+- Verification: `npm run typecheck && npm run build && npm test` passed, 4 files /
+  86 tests. `node --check scripts/minilm-smoke.mjs` and cache-only smoke passed.
+  `git diff --check` passed; cache confirmed ignored. Frontend unchanged/unrun here.
+- Plan: `SEMANTIC_SEARCH_PLAN.md`; proposed read-only POST `/spots/search`, current
+  caller-JWT feed/radius predicates before encoding, bounded text-version cache,
+  final eligibility/text revalidation, dedicated frontend search scope/failure states.
+  No new SQL migration or vector DB proposed. `API_CONTRACT.md` remains unchanged;
+  proposed endpoint is not active. Backend README/env example link preparation.
+- Next: agree contract and implement backend/frontend bounded slices, then 8–12
+  realistic query comparison and live auth/radius/revocation/mobile checks. Semantic
+  search, explored state, reporting and release readiness remain unimplemented/unverified.
+
+### Semantic search implementation — October 8, 2026
+
+- User authorized implementation plus later SQL fixtures/migration if needed. Lead
+  agreed POST `/spots/search` before parallel backend/frontend work; no migration
+  required for in-memory vectors. No packages/private env/remote SQL/deployment/commit.
+- Backend: `src/encoder.ts`, `search.ts`, app/config wiring and tests. Pinned local
+  hash-verified MiniLM, 256-token normalized vectors, fresh caller-JWT feed before
+  ranking, fresh listing/exact-text checks before returning current top-three spots.
+  Empty query/candidates bypass inference. Cache limit100/idleTTL5min, single global
+  permit, 5s inference/40s overall budgets; timed-out native work holds capacity.
+- Frontend: `src/searchApi.ts`, `searchController.ts`, SpotWorkspace and tests.
+  Dedicated read-only POST/45s timeout, labelled explicit-submit draft/clear/retry,
+  same card/map array and original notes. Late successes AND errors discarded across
+  session/feed/area/radius/query/refresh changes, including StrictMode replay.
+- SQL: `backend/supabase/seed_semantic_search.sql` and cleanup companion. Operator
+  supplies three existing enrolled UUIDs privately; A–B already connected, C linked
+  to neither. Commits 14 labelled synthetic metadata spots at (0,0), no images;
+  cleanup bounds IDs/marker and refuses media. Existing settings/connections untouched.
+  Structural tests keep seed text/distances aligned with `semantic_search_fixture.json`;
+  they are not PostgreSQL/RLS evidence. Both scripts remain unapplied.
+- Actual combined commands from each app: `npm run typecheck && npm run build && npm test`.
+  Backend 6 files / 105 tests, frontend 37 tests passed. Frontend build4.20s, entry
+  426.86 kB / workspace194.11 kB; existing treeshake:false retained, no >500kB warning.
+- Actual model/HTTP comparison: `node scripts/evaluate-semantic-search.mjs` after
+  backend build. 12 synthetic queries with actual cached MiniLM and synthetic auth/
+  store; positive Hit@3 11/11 versus7/11 keyword, expected top-one10/11 versus7/11,
+  one unrelated negative empty, four vocabulary-gap improvements. Picnic garden
+  outranks meadow; 0.35 cutoff remains provisional for actual pilot notes.
+- Recorded injected-route timing: cold630.153ms, remaining7.668–35.639ms, median
+  10.082ms. No Supabase network/browser/proxy latency included; not deployment promise.
+- Docs: API_CONTRACT.md, SEMANTIC_SEARCH_SETUP.md, SEMANTIC_SEARCH_EVALUATION.md,
+  updated plan/status/setup/readmes. No live search/UI/phone or direct SQL/Storage
+  audit was run. Missing fixture photos intentionally return errors; use real
+  app-created spots for media/outdoor tests. Never claim these fixtures real places.
+- Next: restart/reload local apps, optionally apply guarded fixture seed privately,
+  test separate user JWTs, radius1/5 behavior, private/revoked/removed exclusions,
+  edits and stale browser responses, then cleanup/restore area/radius. Explored and
+  reporting remain separate unimplemented slices.
+
+### User-run semantic search smoke update — October 8, 2026
+
+- User reports: “all checks pass as expected in the how to try it section.”
+- Recorded as confirmation of that final response's workflow: listed vocabulary-gap
+  queries return expected synthetic matches; saving radius from 5 km to 1 km excludes
+  the 4.5 km pond. Seed/cleanup/restoration are within the overall workflow report,
+  but no separate SQL execution receipts or database state were inspected.
+- Do not extend this confirmation to the setup guide's broader direct-token audience
+  matrix, Public-to-Connections revocation, in-flight edits, exact geographic bounds,
+  model failure, real photo/Storage checks, phone testing or an outdoor outing.
+- No application code changed for this update; prior 105/37 test results remain
+  historical passed evidence, not rerun checks. Next implementation slice is the
+  required per-user self-reported explored state; reporting remains after it.
 
 ### Template for the next slice
 

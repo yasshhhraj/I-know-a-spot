@@ -119,7 +119,8 @@ precision distance. Real-user RPC/API/Storage checks remain separately necessary
 
 ## Evidence and limitations
 
-Combined local checks: backend typecheck/build and **86 tests**; frontend
+At completion of the Public/radius slice, combined local checks were backend
+typecheck/build and **86 tests**; frontend
 typecheck/build and **32 tests**, all passed. Frontend static build: 3.05s, entry
 426.86 kB and workspace 188.47 kB; tree-shaking workaround retained.
 StrictMode feed setup/cleanup replay and stale-response suppression are covered by
@@ -128,4 +129,7 @@ check migration/script structure and mocked transport, not PostgreSQL execution.
 
 No live migration, browser/Leaflet, true radius-boundary/RLS or phone check is marked
 passed. No installation, private env read, model download, deployment or commit was
-performed. AI, explored state, reporting and native wrapping remain unimplemented.
+performed for that slice. MiniLM search is now implemented and checked locally;
+see SEMANTIC_SEARCH_SETUP.md and SEMANTIC_SEARCH_EVALUATION.md. Current user-reported
+Public/radius results and remaining live audits are in WORKBOARD.md. Explored state,
+reporting and native wrapping remain unimplemented.

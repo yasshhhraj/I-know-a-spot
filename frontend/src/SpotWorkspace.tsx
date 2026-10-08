@@ -3,8 +3,10 @@ import { radiusValue, RadiusError, saveRadius, type Profile } from './api'
 import { getSupabaseClient } from './supabase'
 import { apiBaseUrl, normalizeCenter, pilotCenter, type Center } from './config'
 import { SpotMap } from './SpotMap'
-import { FeedScopeLifecycle, SpotScope } from './spotScope'
+import { SpotScope } from './spotScope'
 import { asSpot, asSpots, multipart, photoEndpoint, readOwnConnectionSpots, spotIdPattern, spotRequest, spotsPath, SpotApiError, validateData, validatePhoto, type Audience, type Spot, type SpotData } from './spotApi'
+import { searchQuery, searchSpots, SearchApiError, type SearchResult } from './searchApi'
+import { ScopedResultsController } from './searchController'
 
 type Props = { profile: Profile; recheck: () => void }
 const button = 'min-h-12 rounded-lg border border-stone-600 px-4 py-2 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50'
@@ -160,8 +162,14 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
   const [spots, setSpots] = useState<Spot[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [listStatus, setListStatus] = useState('Loading Connections…')
+  const [listPhase, setListPhase] = useState<'loading' | 'ready' | 'error' | 'blocked'>('loading')
   const [listKey, setListKey] = useState('')
-  const feedScope = useRef(new FeedScopeLifecycle())
+  const resultsController = useRef(new ScopedResultsController())
+  const [queryDraft, setQueryDraft] = useState('')
+  const [submittedQuery, setSubmittedQuery] = useState('')
+  const [queryError, setQueryError] = useState('')
+  const [searchResult, setSearchResult] = useState<SearchResult | null>(null)
+  const [searchRetry, setSearchRetry] = useState(0)
   const [detail, setDetail] = useState<Spot | null>(null)
   const [detailStatus, setDetailStatus] = useState('')
   const [mode, setMode] = useState<'list' | 'detail' | 'add' | 'edit' | 'profile'>('list')
@@ -171,30 +179,69 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
   const detailRevision = useRef(0)
   const refresh = () => setRevision(n => n + 1)
   useEffect(() => { setSettings(profile); setRadiusDraft(String(profile.publicRadiusKm)) }, [profile.id, profile.displayName, profile.publicRadiusKm])
-  const requestKey = `${feed}:${center?.latitude ?? 'unset'}:${center?.longitude ?? 'unset'}:${settings.publicRadiusKm}:${revision}`
+  const requestKey = JSON.stringify([profile.id, feed, center?.latitude, center?.longitude, settings.publicRadiusKm, revision, submittedQuery, searchRetry])
   const visibleSpots = listKey === requestKey ? spots : []
-  const visibleStatus = listKey === requestKey ? listStatus : feed === 'public' && !center ? 'Choose a discovery center to browse Public spots.' : `Loading ${feed === 'public' ? 'Public' : 'Connections'}…`
+  const visibleStatus = listKey === requestKey ? listStatus : feed === 'public' && !center ? 'Choose and confirm a discovery center to browse or search Public spots.' : submittedQuery ? 'Searching spots…' : `Loading ${feed === 'public' ? 'Public' : 'Connections'}…`
+  const visiblePhase = listKey === requestKey ? listPhase : feed === 'public' && !center ? 'blocked' : 'loading'
+  const visibleSearchResult = listKey === requestKey ? searchResult : null
   const enteredCenter = normalizeCenter(draftLat.trim() ? Number(draftLat) : NaN, draftLon.trim() ? Number(draftLon) : NaN)
   const stagedCenter = enteredCenter && (!center || enteredCenter.latitude !== center.latitude || enteredCenter.longitude !== center.longitude) ? enteredCenter : null
 
   useEffect(() => {
-    let active = true
-    const requests = feedScope.current.begin()
     setSpots([])
+    setSearchResult(null)
     setListKey(requestKey)
-    if (feed === 'public' && !center) { setListStatus('Choose a discovery center to browse Public spots.'); return () => { active = false; feedScope.current.end(requests) } }
-    setListStatus(`Loading ${feed === 'public' ? 'Public' : 'Connections'}…`)
-    void requests.run(profile.id, async () => (await getSupabaseClient().auth.getSession()).data.session, async (token, signal) => asSpots(await spotRequest(apiBaseUrl, token, spotsPath(feed, center ?? undefined), signal), apiBaseUrl, feed)).then(result => {
-      if (!active || !result) return
-      setSpots(result); setListStatus(result.length ? '' : feed === 'public' ? 'No Public spots inside this radius. Adjust the radius in Profile or choose another center; the feed is not widened automatically.' : 'No spots from you or your connections yet.')
-    }).catch(err => { if (active) { setSpots([]); setListStatus(failure(err, recheck)) } })
-    return () => { active = false; feedScope.current.end(requests) }
-  }, [profile.id, feed, center, settings.publicRadiusKm, revision, recheck, requestKey])
+    if (feed === 'public' && !center) { resultsController.current.invalidate(); setListPhase('blocked'); setListStatus('Choose and confirm a discovery center to browse or search Public spots.'); return }
+    setListPhase('loading')
+    setListStatus(submittedQuery ? 'Searching spots…' : `Loading ${feed === 'public' ? 'Public' : 'Connections'}…`)
+    return resultsController.current.begin(requestKey, profile.id,
+      async () => (await getSupabaseClient().auth.getSession()).data.session,
+      async (token, signal) => submittedQuery
+        ? searchSpots(apiBaseUrl, token, submittedQuery, feed, center, signal)
+        : asSpots(await spotRequest(apiBaseUrl, token, spotsPath(feed, center ?? undefined), signal), apiBaseUrl, feed),
+      event => {
+        if (event.status === 'error') {
+          setSpots([]); setSearchResult(null)
+          setListPhase('error')
+          if (event.error instanceof SearchApiError) {
+            if (event.error.failure.kind === 'auth') recheck()
+            setListStatus(event.error.failure.message)
+          } else setListStatus(failure(event.error, recheck))
+          return
+        }
+        setListPhase('ready')
+        if (submittedQuery) {
+          const result = event.value as SearchResult
+          setSearchResult(result); setSpots(result.spots)
+          setListStatus(result.spots.length ? `${result.spots.length} semantic ${result.spots.length === 1 ? 'match' : 'matches'}. Original member notes are shown.` :
+            result.emptyReason === 'no_candidates' ? feed === 'public' ? 'No Public spots inside this radius to search. Adjust the radius in Profile or choose another center; the search is not widened.' : 'No spots from you or your connections to search yet.' : 'No semantic matches for this query among eligible spots. Try other words or browse instead.')
+        } else {
+          const rows = event.value as Spot[]
+          setSpots(rows); setListStatus(rows.length ? '' : feed === 'public' ? 'No Public spots inside this radius. Adjust the radius in Profile or choose another center; the feed is not widened automatically.' : 'No spots from you or your connections yet.')
+        }
+      })
+  }, [profile.id, feed, center, settings.publicRadiusKm, revision, recheck, requestKey, submittedQuery])
+
+  function submitSearch(event: FormEvent) {
+    event.preventDefault()
+    try {
+      const query = searchQuery(queryDraft)
+      if (feed === 'public' && !center) { setQueryError('Confirm a discovery center before searching Public spots.'); return }
+      setQueryError(''); resultsController.current.invalidate(); setSpots([]); setSearchResult(null)
+      setSubmittedQuery(query); setSearchRetry(n => n + 1)
+    } catch (error) { if (error instanceof SearchApiError) setQueryError(error.failure.message) }
+  }
+  function clearSearch() {
+    resultsController.current.invalidate(); setSpots([]); setSearchResult(null)
+    setQueryDraft(''); setSubmittedQuery(''); setQueryError(''); setSearchRetry(n => n + 1)
+  }
+  function retrySearch() { resultsController.current.invalidate(); setSpots([]); setSearchResult(null); setSearchRetry(n => n + 1) }
 
   function chooseCenter(event: FormEvent) {
     event.preventDefault()
     const next = normalizeCenter(draftLat.trim() === '' ? NaN : Number(draftLat), draftLon.trim() === '' ? NaN : Number(draftLon))
     if (!next) { setCenterMessage('Enter finite latitude (-90 to 90) and longitude (-180 to 180).'); return }
+    resultsController.current.invalidate()
     setCenterMessage('Manual discovery center confirmed. Map panning alone does not change it.')
     setCenterSource('manual'); setCenter(next)
   }
@@ -207,7 +254,7 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
     setRadiusPending(true); setRadiusError(''); setRadiusMessage('')
     try {
       const result = await scope.run(profile.id, async () => (await getSupabaseClient().auth.getSession()).data.session, (token, signal) => saveRadius(apiBaseUrl, token, profile.id, value, signal))
-      if (result) { setSettings(result); setRadiusDraft(String(result.publicRadiusKm)); setRadiusMessage(`Saved ${result.publicRadiusKm} km. Public results will refresh.`); refresh() }
+      if (result) { resultsController.current.invalidate(); setSettings(result); setRadiusDraft(String(result.publicRadiusKm)); setRadiusMessage(`Saved ${result.publicRadiusKm} km. Public results will refresh.`); refresh() }
     } catch (error) {
       if (error instanceof RadiusError) { if (error.kind === 'auth') recheck(); setRadiusError(error.message) }
       else setRadiusError('Radius save unavailable. Your previous saved radius remains displayed.')
@@ -258,10 +305,10 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
     setBusyDelete(true); setDetailStatus('')
     try {
       const result = await scope.run(profile.id, async () => (await getSupabaseClient().auth.getSession()).data.session, (token, signal) => spotRequest(apiBaseUrl, token, `/spots/${id}`, signal, 'DELETE'))
-      if (result === null) { setCleanupId(null); setSpots(current => current.filter(s => s.id !== id)); back(); refresh() }
+       if (result === null) { resultsController.current.invalidate(); setCleanupId(null); setSpots(current => current.filter(s => s.id !== id)); back(); refresh() }
     } catch (err) {
       if (err instanceof SpotApiError && err.failure.kind === 'cleanup') {
-        back(); setCleanupId(id); setSpots(current => current.filter(s => s.id !== id)); refresh()
+         resultsController.current.invalidate(); back(); setCleanupId(id); setSpots(current => current.filter(s => s.id !== id)); refresh()
       }
       setDetailStatus(failure(err, recheck))
     } finally { setBusyDelete(false) }
@@ -269,10 +316,10 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
 
   return <section className="mt-8 border-t border-stone-300 pt-6" aria-label="Spot workspace">
     <div className="flex justify-center"><div role="group" aria-label="Discovery feed" className="inline-flex rounded-lg border border-emerald-800 p-1">
-      {(['connections', 'public'] as const).map(value => <button key={value} type="button" aria-pressed={feed === value} className={`${button} border-0 ${feed === value ? 'bg-emerald-800 text-white' : 'bg-white'}`} onClick={() => { if (feed !== value) { feedScope.current.invalidate(); back(); setFeed(value) } }}>{value === 'public' ? 'Public' : 'Connections'}</button>)}
+       {(['connections', 'public'] as const).map(value => <button key={value} type="button" aria-pressed={feed === value} className={`${button} border-0 ${feed === value ? 'bg-emerald-800 text-white' : 'bg-white'}`} onClick={() => { if (feed !== value) { resultsController.current.invalidate(); back(); setFeed(value) } }}>{value === 'public' ? 'Public' : 'Connections'}</button>)}
     </div></div>
     <h3 className="mt-4 text-xl font-semibold">{feed === 'public' ? 'Public discoveries' : 'Connections'}</h3>
-    <p className="mt-2 text-sm">{feed === 'public' ? `Public posts within your saved ${settings.publicRadiusKm} km straight-line radius of the ${centerSource === 'pilot' ? 'configured pilot area' : centerSource === 'manual' ? 'chosen manual area' : 'center you choose'}. Distance is approximate, not travel time.` : 'Newest spots from you and your enrolled connections, including their Public posts.'} Only the server-returned feed is shown; list filtering is not authorization. AI search, explored state and reports are not yet available.</p>
+     <p className="mt-2 text-sm">{feed === 'public' ? `Public posts within your saved ${settings.publicRadiusKm} km straight-line radius of the ${centerSource === 'pilot' ? 'configured pilot area' : centerSource === 'manual' ? 'chosen manual area' : 'center you choose'}. Distance is approximate, not travel time.` : 'Newest spots from you and your enrolled connections, including their Public posts.'} The server determines eligibility; client display filtering is not authorization. Explored state and reports are not yet available.</p>
     {mode === 'list' && <>
       {feed === 'public' && <div className="mt-4 rounded-lg border border-stone-300 p-3">
         <h4 className="font-semibold">Discovery center</h4>
@@ -280,15 +327,24 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
         <form onSubmit={chooseCenter} className="mt-3 space-y-2"><div className="grid gap-3 sm:grid-cols-2"><label>Center latitude (-90 to 90)<input className={input} type="number" inputMode="decimal" min={-90} max={90} step="any" value={draftLat} onChange={e => setDraftLat(e.target.value)} /></label><label>Center longitude (-180 to 180)<input className={input} type="number" inputMode="decimal" min={-180} max={180} step="any" value={draftLon} onChange={e => setDraftLon(e.target.value)} /></label></div>
           <button type="submit" className={button}>Confirm discovery center</button>
         </form>
-        {pilotCenter && centerSource !== 'pilot' && <button type="button" className={`${button} mt-2`} onClick={() => { const fallback = pilotCenter; if (!fallback) return; setCenter(fallback); setCenterSource('pilot'); setDraftLat(String(fallback.latitude)); setDraftLon(String(fallback.longitude)); setCenterMessage('Configured pilot area restored.') }}>Use configured pilot area</button>}
+         {pilotCenter && centerSource !== 'pilot' && <button type="button" className={`${button} mt-2`} onClick={() => { const fallback = pilotCenter; if (!fallback) return; resultsController.current.invalidate(); setCenter(fallback); setCenterSource('pilot'); setDraftLat(String(fallback.latitude)); setDraftLon(String(fallback.longitude)); setCenterMessage('Configured pilot area restored.') }}>Use configured pilot area</button>}
         {centerMessage && <p role="status" className="mt-2">{centerMessage}</p>}
         <p className="mt-2 text-sm">Enter approximate coordinates to display the map, or tap it to stage a center; confirm before Public results change. Numeric entry works without map tiles.</p>
-      </div>}
-      <div className="mt-4 flex flex-wrap gap-2"><button className={`${button} bg-emerald-800 text-white`} onClick={() => setMode('add')}>Add a spot</button>
-      <button className={button} onClick={refresh}>Reload {feed === 'public' ? 'Public' : 'Connections'}</button>
+       </div>}
+       <form onSubmit={submitSearch} className="mt-4 space-y-2" role="search">
+         <label className="block font-medium" htmlFor="spot-query">Find spots by meaning (max 200 characters)</label>
+         <input id="spot-query" className={input} type="search" value={queryDraft} onChange={e => setQueryDraft(e.target.value)} aria-describedby="search-help" />
+         <p id="search-help" className="text-sm">Submit to search the selected feed. Changing this draft does not update results until you select Find spots.</p>
+         <div className="flex flex-wrap gap-2"><button type="submit" className={`${button} bg-emerald-800 text-white`}>Find spots</button><button type="button" className={button} onClick={clearSearch}>Clear search / Browse instead</button></div>
+         {queryError && <p role="alert" className="text-red-800">{queryError}</p>}
+       </form>
+       {submittedQuery && <h4 className="mt-4 font-semibold">Semantic matches <span className="text-sm font-normal">for your submitted query (up to 3, original member notes)</span></h4>}
+       <div className="mt-4 flex flex-wrap gap-2"><button className={`${button} bg-emerald-800 text-white`} onClick={() => setMode('add')}>Add a spot</button>
+       <button className={button} onClick={() => { resultsController.current.invalidate(); refresh() }}>Reload {submittedQuery ? 'search' : feed === 'public' ? 'Public' : 'Connections'}</button>
       <button className={button} onClick={() => setMode('profile')}>Profile &amp; radius</button></div>
       <div className="mt-4"><SpotMap center={feed === 'public' && center ? [center.latitude, center.longitude] : undefined} stagedCenter={feed === 'public' && stagedCenter ? [stagedCenter.latitude, stagedCenter.longitude] : undefined} viewCenter={feed === 'public' && stagedCenter ? [stagedCenter.latitude, stagedCenter.longitude] : feed === 'connections' && visibleSpots.length ? [visibleSpots[0].latitude, visibleSpots[0].longitude] : undefined} radiusKm={feed === 'public' && center ? settings.publicRadiusKm : undefined} spots={visibleSpots} selectedId={selectedId} onSelect={openDetail} onPick={feed === 'public' ? (lat, lon) => { const next = normalizeCenter(lat, lon); if (next) { setDraftLat(String(lat)); setDraftLon(String(lon)); setCenterMessage('Map center staged. Results still use the confirmed center until you confirm this one.') } } : undefined} /></div>
-      {visibleStatus && <p role="status" className="mt-4">{visibleStatus}</p>}
+       {visibleStatus && <p role={visiblePhase === 'error' ? 'alert' : 'status'} className="mt-4">{visibleStatus}</p>}
+       {submittedQuery && !visibleSearchResult && visiblePhase === 'error' && <button type="button" className={button} onClick={retrySearch}>Retry search</button>}
       {detailStatus && <p role="alert" className="mt-4 text-red-800">{detailStatus}</p>}
       {cleanupId && <p role="alert" className="mt-4">Spot is hidden, but photo cleanup is pending. <button className={button} disabled={busyDelete} onClick={() => void remove(cleanupId)}>Retry deletion</button></p>}
       <ul className="mt-4 space-y-4">{visibleSpots.map(spot => <li key={spot.id} className="rounded-lg border border-stone-300 p-3">
@@ -313,8 +369,8 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
         {detail.ownerId === profile.id && <div className="flex gap-3"><button className={button} onClick={() => setMode('edit')}>Edit metadata</button><button className={button} disabled={busyDelete} onClick={() => void remove(detail.id)}>{busyDelete ? 'Deleting…' : 'Delete spot'}</button></div>}
       </article>}
     </>}
-    {mode === 'add' && <Form scope={scope} profile={profile} recheck={recheck} initial={empty()} refresh={refresh} onCancel={back} onSaved={spot => { refresh(); openDetail(spot.id) }} />}
-    {mode === 'edit' && detail && <Form key={detail.id} scope={scope} profile={profile} recheck={recheck} original={detail} initial={{ title: detail.title, note: detail.note, audience: detail.audience, accessNote: detail.accessNote, accessConfirmed: true, latitude: String(detail.latitude), longitude: String(detail.longitude) }} refresh={refresh} onCancel={() => setMode('detail')} onSaved={spot => { setDetail(spot); setMode('detail'); refresh() }} />}
+     {mode === 'add' && <Form scope={scope} profile={profile} recheck={recheck} initial={empty()} refresh={() => { resultsController.current.invalidate(); refresh() }} onCancel={back} onSaved={spot => { resultsController.current.invalidate(); refresh(); openDetail(spot.id) }} />}
+     {mode === 'edit' && detail && <Form key={detail.id} scope={scope} profile={profile} recheck={recheck} original={detail} initial={{ title: detail.title, note: detail.note, audience: detail.audience, accessNote: detail.accessNote, accessConfirmed: true, latitude: String(detail.latitude), longitude: String(detail.longitude) }} refresh={() => { resultsController.current.invalidate(); refresh() }} onCancel={() => setMode('detail')} onSaved={spot => { resultsController.current.invalidate(); setDetail(spot); setMode('detail'); refresh() }} />}
   </section>
 }
 
