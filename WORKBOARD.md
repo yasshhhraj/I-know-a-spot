@@ -6,7 +6,7 @@ and record actual evidence, not anticipated success. No private payloads here.
 ## Current state
 
 Pilot auth/sharing, Connections/Public feed/radius, MiniLM search, explored state
-and reporting/operator CLI are implemented with local tests: frontend56/backend137
+and reporting/operator CLI are implemented with local tests: frontend62/backend137
 last passed; both typecheck/build. The schema/RLS
 migrations have not been applied by the assistant. The user reports that live enrolled
 sign-in shows the expected screen and an unenrolled account shows “Not enrolled.”
@@ -19,16 +19,26 @@ and confirmed that the second account can see the shared spot. This is user-repo
 end-to-end preview evidence; direct RLS/Storage authorization is still unverified.
 The user now confirms the owner sees Edit/Delete while the connected viewer sees
 external Directions without owner controls. This verifies the live UI behavior for
-the tested accounts; direct mutation-denial and Storage checks remain pending.
+the tested accounts. The latest validation report confirms the tested access
+matrix. Direct database/Storage checks were initially skipped; subsequent direct
+spots SELECT checks for B/C are partially user-confirmed below, not a full audit.
 The user confirms photos load for uploader and connected viewer, Public detail is
 viewable by ID, and deletion works as expected. The user clarified that the
 unconnected account cannot open a Connections-only spot but successfully opens a
 Public spot by ID. This confirms the tested browser detail audience matrix, not
-an independent direct Storage or mutation audit. Mobile testing remains unrun under
-the current single-device local server configuration.
+an independent direct Storage or mutation audit. Phone testing through a user-run
+HTTPS tunnel now works as expected, including the camera-return fix (user report).
+The user also reports a real outing and real-note search completed; no private
+locations, device details, query outcomes or new quality measurements were supplied.
 Frontend retains the documented tree-shaking workaround; lazy-loading now avoids
-the >500 kB chunk warning. No private env contents were inspected. Direct media/
-mutation boundaries, audience revocation and browser-specific checks remain pending.
+the >500 kB chunk warning. No credentials or private locations are recorded here.
+Tested Public-to-Connections revocation, post-delete app/API paths and failure/
+stale-response checks are now user-confirmed. Direct spots SELECT now succeeds
+for B's tested accessible row; non-owner C reads Public (one row) and is filtered
+from Connections-only (zero rows, no error). C's corresponding detail/photo API
+statuses are200/200 and404/404. Direct Storage and forbidden database/Storage writes
+remain unverified; independent RLS/grant/media-erasure and controlled failure audits are not
+inferred from browser success.
 After identifying the missing Public migration as the 503 blocker and receiving
 the user-run setup instructions, the user confirms a shared Public spot now loads
 successfully in the Public feed. The user confirms radius changes and reload
@@ -42,13 +52,15 @@ final “How to try it” section passed: the listed live semantic queries and s
 radius 5-to-1 km pond exclusion behaved as expected. This is user-reported browser
 smoke evidence, not independent SQL/RLS or media verification. The seed/cleanup
 workflow is covered by that overall report, without separately inspected SQL
-receipts. Broader direct search authorization/revocation, phone testing and actual
-pilot-corpus quality remain pending. No search migration is needed.
+receipts. Real-note search and the tested phone flow are now user-reported done;
+no actual-corpus comparison scores, deployed-resource measurements or new timings
+were supplied. Direct SQL/RPC/RLS checks remain pending. No search migration is needed.
 The user now reports the listed Explored activation/browser checks passed: explored
 and unexplored persist across reopen/reload/sign-in, and another eligible account
 has independent state. Migration activation is covered by that overall workflow
 report; no separate SQL receipts or direct RLS checks were inspected. Broader
-revocation/tombstone/cascade and phone checks remain pending. Reporting/operator
+direct SQL/cascade and controlled failure audits remain pending. Tested revocation/
+post-delete app paths and phone flow are user-confirmed. Reporting/operator
 CLI is implemented; the user reports all five listed activation/check steps passed
 and the operator delete command worked without affecting other spots. Migration
 activation, submission/dedup/private queue and the referenced checks are covered
@@ -71,19 +83,19 @@ Local tests do not prove remote RLS or a finished pilot.
 | AUTH-LIVE | Real sign-in/session and direct RLS checks | User then lead | Partial | Enrolled/unenrolled access, refresh restoration, sign-out and subsequent account switching user-confirmed; direct Data API and SQL boundaries still pending |
 | SHARE-BE | Spot schema, protected media, owner write/delete endpoints | backend-builder; backend/ only; lead integration | Completed (local only) | Lead typecheck/build and 73 tests pass; ambiguous INSERT retains media, real JPEG/PNG/WebP metadata/orientation fixtures; SQL user-run |
 | SHARE-FE | Browser photo/pin/note/audience form and connection preview/detail | frontend-builder; frontend/ only; lead integration | Completed (local only) | Lead typecheck/build and 22 tests pass; Unicode/uncertain-response, wrapped longitude/stale scopes; browser map/load/camera checks unrun |
-| SHARE-LIVE | Apply spot/storage migration and test connected/unconnected access | User then lead | Partial (user-reported live flow) | Owner/connection photos load; owner controls and deletion work; unconnected account denied Connections-only detail and allowed Public detail by ID; direct mutation/Storage checks and audience revocation pending |
+| SHARE-LIVE | Apply spot/storage migration and test connected/unconnected access | User then lead | Partial (user-reported validation passed) | Access matrix, Public-to-Connections revocation, post-delete app/API paths and phone flow as expected; direct database/Storage explicitly skipped; independent grants/media cleanup audit pending |
 | FEEDS | Shared Connections/Public feed/map, Profile radius/area | Lead contract/integration; backend-builder `backend/`; frontend-builder `frontend/` | Completed (local only) | Lead typecheck/build: backend 86 tests, frontend 32 tests pass; SQL RPC/script prepared, no live execution |
 | FEEDS-LIVE | Public migration and real radius/RPC/browser tests | User then lead; PUBLIC_DISCOVERY_SETUP.md | Partial (user-reported core flow passed) | Public load, radius change/reload persistence and out-of-radius list exclusion with ID detail access confirmed; exact boundary, list/map agreement and direct RPC/RLS checks pending |
 | AI | Real open-weight encoder and feed-scoped search | Lead integration/docs; backend-builder `backend/src/`, `backend/tests/`; frontend-builder `frontend/src/`, `frontend/tests/` | Completed (local; live smoke user-confirmed) | Backend 105/frontend 37 tests and real 12-query synthetic comparison passed; user confirms listed live queries and 5-to-1 km pond exclusion; broader direct authorization/revocation/mobile checks pending |
 | AI-SQL | Search-check seed/cleanup scripts, no embedding migration | Lead; `backend/supabase/seed_semantic_search.sql`, `cleanup_semantic_search.sql`, `SEMANTIC_SEARCH_SETUP.md` | Completed (prepared only) | 14 guarded synthetic fixtures, three existing enrolled accounts, collision/media/marker safeguards; 3 structural tests passed; no PostgreSQL execution or Storage objects |
-| AI-LIVE | Populate optional fixtures and verify real-token search, revocation/radius/phone behavior | User then lead; SEMANTIC_SEARCH_SETUP.md | Partial (user-reported smoke passed) | “How to try it” workflow, listed queries and radius reduction user-confirmed; individual SQL receipts not inspected; direct access/revocation, real-corpus threshold, target resources, phone and exact RPC/RLS boundaries pending |
+| AI-LIVE | Populate optional fixtures and verify real-token search, revocation/radius/phone behavior | User then lead; SEMANTIC_SEARCH_SETUP.md | Partial (user-reported validation/search done) | Listed queries/radius reduction plus tested revocation/post-delete/failure/phone flow as expected; real-note search done, no new comparison scores; direct database/Storage skipped, exact RPC/RLS/threshold/resources pending |
 | AI-PREP | Download pinned MiniLM and plan integration; no search implementation | Lead plan/verification; backend-builder `backend/scripts/minilm-smoke.mjs` | Completed (local preparation only) | Pinned q8 weight checksum matches HF; synthetic CPU and cache-only checks pass; backend typecheck/build/86 tests pass; plan in `SEMANTIC_SEARCH_PLAN.md` |
 | SAFETY | Reports and protected operator removal | Lead contract/SQL/docs; backend-builder src/tests; frontend-builder src/tests | Completed (local; listed live smoke user-confirmed) | 137 backend/56 frontend tests and typecheck/build; user confirms all five activation/check steps and operator deletion with other spots unaffected; independent direct SQL/Storage and failure audits pending |
-| SAFETY-LIVE | Apply0005 and test private persistence/queue/removal boundaries | User then lead; REPORTING_SETUP.md | Partial (user-reported workflow passed) | Listed five-step activation/report/dedup/private queue/check workflow and explicit operator deletion user-confirmed; no individual SQL/CLI receipts or full direct access/media/failure-recovery audit inspected |
-| CAMERA-RETURN | Prevent unchanged auth refocus from resetting Add form | frontend-builder `frontend/src/authController.ts`, `frontend/tests/auth.test.ts`; lead docs/checks | In progress | User reports capture return resets to feed, picker works; synthetic repeated SIGNED_IN emits verifying/enrolled and unmounts workspace; duplicate-session regression and phone retry pending |
+| SAFETY-LIVE | Apply0005 and test private persistence/queue/removal boundaries | User then lead; REPORTING_SETUP.md | Partial (user-reported app/API validation passed) | Five-step workflow/operator removal and tested post-delete app/API paths as expected; direct database/Storage explicitly skipped; no independent SQL/CLI/media-erasure/controlled-cleanup audit |
+| CAMERA-RETURN | Prevent unchanged auth refocus from resetting Add form | frontend-builder `frontend/src/authController.ts`, `frontend/tests/auth.test.ts`; lead docs/checks | Completed (local; handset user-confirmed) | 62 frontend tests/typecheck/build pass; user reports camera fix works and phone flow as expected; new tokens/account changes/explicit rechecks still fail-closed; no full browser-discard recovery claim |
 | EXPLORED | Per-user self-reported explored state | Lead contract/SQL/docs; backend-builder `backend/src/`, `backend/tests/`; frontend-builder `frontend/src/`, `frontend/tests/` | Completed (local; listed live smoke user-confirmed) | 118 backend/46 frontend tests and typecheck/build pass; user confirms true/false persistence across reopen/reload/sign-in and independent account state; direct SQL/RLS and broader boundaries remain pending |
 | EXPLORED-LIVE | Apply migration0004 and verify persistence, isolation and removal boundaries | User then lead; EXPLORED_SETUP.md | Partial (user-reported quick checks passed) | Listed activation/browser persistence/two-account checks confirmed; no independent SQL receipts, direct table/RPC audit, revocation/tombstone/cascade or phone proof |
-| PILOT | Combined mobile/outdoor test and submission evidence | Lead | Pending | Document actual checks, real outing, limits, and a draft; no unrequested publication |
+| PILOT | Combined mobile/outdoor test and submission evidence | User then lead | Partial (phone/outing user-confirmed) | Tested phone flow as expected; real outing and real-note search done; direct database/Storage skipped, metrics/demo/submission artifacts and remaining checks not supplied; no unrequested publication |
 
 ## Handoff format
 
@@ -441,6 +453,95 @@ Local tests do not prove remote RLS or a finished pilot.
   checks remain137 backend/56 frontend with typecheck/build and MiniLM regression.
 - Next: remaining direct audience/revocation/RLS/Storage/removal boundaries and
   reachable phone/browser/outdoor pilot checks; do not expand feature scope.
+
+### Camera-return auth reset fix
+
+- User reports Take photo -> accept photo returns to the feed repeatedly, while
+  Choose photo works. Phone/browser and a true document reload were not captured.
+- Lead traced native-camera/tab return to a supported SDK behavior: installed
+  auth-js GoTrueClient.ts documents repeated SIGNED_IN on tab refocus. Controller
+  previously accepted every event and emitted verifying; App mounts workspace
+  only while enrolled, so this destroys local Add fields/file/mode.
+- Before-fix synthetic event trace: verifying,enrolled,verifying,enrolled. After
+  exact same reproduction: verifying,enrolled only. This proves the app reset
+  path, not that the handset emitted that event or never reloaded its document.
+- Changed frontend/src/authController.ts: ignore only exact same non-null user+
+  access-token SIGNED_IN while enrolled/verifying; keep pending verification alive.
+  New tokens/accounts, other events, sign-out, API access recheck, error recovery
+  and explicit retry retain fail-closed verification/revision fencing.
+- frontend-builder added6 regression tests in frontend/tests/auth.test.ts; first
+  two failed before fix. Lead reran npm run typecheck && npm run build && npm test
+  in frontend/:62 tests passed, build2.46s, entry427.22kB/workspace205.21kB. Backend
+  untouched/unrun here; its137-test result remains historical. git diff --check passed.
+- No camera API rewrite, persistent draft/photo storage, network payload logging,
+  installs, private config reads/edits, Supabase changes or live operations for
+  this fix. Existing user-owned Vite tunnel/proxy changes preserved.
+- Research: Expo/Supabase resume UX article warns resume is a separate test surface
+  (no comments); browser-camera article emphasizes lifecycle/device testing (no
+  comments), but its getUserMedia/WebRTC approach was NOT adopted. Installed SDK
+  comments plus deterministic controller regression are the actual fix evidence.
+- Next handset check: refresh once before starting; enter title/note/pin, capture
+  and accept, expect SAME Add form and preview; cancel capture preserves old fields/
+  selection; repeat capture, choose-photo and save. If still resets, collect only
+  phone/browser and whether verification/spinner or real document reload occurs;
+  browser process discard/actual reload and genuine token refresh are not solved
+  by this narrow duplicate-event guard. Keep phone acceptance pending.
+
+### User-reported validation and camera confirmation
+
+The user confirms the camera fix works and provides these outcomes:
+
+| Validation area | Reported result |
+| --- | --- |
+| Access matrix | As expected |
+| Public -> Connections revocation | As expected |
+| All post-delete access paths | As expected for tested app/API paths |
+| Direct database/Storage | Explicitly skipped |
+| Failure/stale-response checks | As expected for tested scenarios |
+| Phone flow | Works as expected, including camera-return fix |
+| Real outing and real-note search | Done |
+
+- Evidence is the user's overall report, not independently inspected network/SQL/
+  Storage receipts. The explicit direct database/Storage skip applies even though
+  the earlier post-delete checklist also mentioned direct database/media checks.
+- Do not invent outing location/date/photos, device/browser counts, actual query
+  results, AI-versus-keyword improvement, latency or phone-performance metrics.
+  Existing synthetic MiniLM benchmark remains separate evidence.
+- Camera/phone flow is no longer awaiting the user's retry. This does not imply
+  a full browser process discard retains a draft, or genuine token changes can
+  skip fail-closed verification. No persistent draft/photo storage was added.
+- Failed/uncertain writes, controlled media-cleanup failure, corrupted model,
+  exact radius/RPC/grant checks and SQL cascade audits are not individually
+  inferred from the aggregate failure/stale-response report.
+- Documentation-only update, completed after an interrupted write was found not
+  to have changed files. Existing camera fix/tests preserved; no new app checks,
+  migrations, deletions, private env reads, commits or live operations repeated.
+- Next priority: ordinary-user direct database/RLS/Storage verification in
+  SPOT_SHARING_SETUP.md section6, then record precise search/demo evidence for
+  delivery. Keep this a functionally tested pilot with an outstanding security
+  validation gap, not an independently security-validated release.
+
+### User-reported ordinary-user direct spot SELECT checks
+
+- B's tested accessible direct SELECT: failed=false,rowCount=1. The spot audience
+  in that B-only report was not separately supplied; do not assume it covered every
+  private/owner case.
+- Non-owner unconnected enrolled C, active Public spot: direct SELECT
+  failed=false,rowCount=1; audience=public,isOwner=false; detail/photo200/200.
+- C, another unconnected author's Connections-only spot: audience=null and
+  detail/photo404/404, then user confirms the expected SELECT summary
+  failed=false,rowCount=0,errorCode=null. This is successful RLS filtering, not
+  treating a failed query as an empty authorized result.
+- Initial C query failure was attributed by the user to an omitted/placeholder
+  spot ID; no policy weakening, admin fallback or credential change was required.
+- These are user-run ordinary-session Data API checks of the listed allowed
+  spot columns. No real IDs/tokens/private query output retained here. Supersedes
+  the earlier total database skip only for these sampled spot-read cases.
+- Still pending: direct Storage downloads/public-URL denial, forbidden direct
+  table/Storage writes, ordinary report/explored grants/isolation, de-enrollment,
+  deleted/revoked direct Storage/DB cases and independent SQL/media-erasure audits.
+- Documentation-only update. No code/test rerun, migrations, live deletion or
+  other external operations performed. Last checks remain62 frontend/137 backend.
 
 ### Template for the next slice
 

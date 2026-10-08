@@ -57,6 +57,11 @@ export class AuthController {
         this.session = null
         this.update({ kind: 'signedOut' })
       } else if (this.view.kind !== 'signingOut' && this.view.kind !== 'logoutFailed') {
+        // GoTrue can emit SIGNED_IN again on refocus. Keep a verified workspace
+        // (or its pending check) intact only for the exact same non-null session.
+        if (event === 'SIGNED_IN' && session && this.session &&
+          (this.view.kind === 'enrolled' || this.view.kind === 'verifying') &&
+          session.user.id === this.session.user.id && session.access_token === this.session.access_token) return
         this.accept(session)
       }
     })

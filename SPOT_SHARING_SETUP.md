@@ -251,6 +251,40 @@ Keep inspection output private; no automatic janitor/scheduler is implemented.
 
 ## 8. Browser/phone and release gaps
 
+### Camera return regression — local fix, handset success user-confirmed
+
+The user reports capture/accept resetting to the feed while Choose photo works.
+One app-side reset path is reproduced: Supabase SIGNED_IN can repeat on refocus
+with identical user/token; the previous controller unmounted the workspace during
+verification. The fix ignores only that duplicate while enrolled/verifying. New
+tokens/accounts, sign-out and explicit access checks still reverify and clear the
+workspace. No persistent draft/photo cache or in-app camera was added.
+
+Follow-up: the user confirms the fix works and phone flow is now as expected.
+They also report the access matrix, Public-to-Connections revocation, tested
+post-delete app/API paths and failure/stale-response checks as expected; real outing
+and real-note search done. Direct database/Storage checks were explicitly skipped.
+This is user-reported validation, not an independent RLS/Storage/grant/media-erasure
+audit. Section6 remains the next security-validation step. The following camera
+steps are retained as regression instructions, not an outstanding required retry.
+
+Reload once BEFORE entering the draft so the new code is loaded. Then:
+1. Add a spot, enter title/note/pin and choose an audience.
+2. Take photo -> capture -> accept: the same Add form and fields should remain,
+   with selected-photo preview or an honest unsupported/oversize message.
+3. Cancel another capture: fields and previous selection remain; no submission.
+4. Repeat capture and ordinary Choose photo; neither should navigate to the feed.
+5. Submit once, verify saved detail/photo, and check sign-out/account switching
+   still removes the previous account's workspace/content.
+
+62 local frontend tests/typecheck/build pass; no real-phone camera run by the
+assistant. If reset persists, record phone/browser and whether a verification
+screen or actual page loading occurs, without tokens/photos/private logs. A full
+browser document reload/process discard or genuine token refresh is distinct from
+this fixed duplicate-event path and is not solved by the guard.
+
+### Remaining device checks
+
 - Test camera capture and library selection/cancellation on pilot devices. HEIC,
   animation and inputs above 20 million pixels are rejected even below 10 MiB.
   A real phone capture may need conversion/downscaling; no conversion UI exists.

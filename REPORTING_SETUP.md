@@ -33,6 +33,12 @@ SQL/CLI receipts and individual direct-route/Storage checks were not inspected.
 This is live smoke evidence, not an independent RLS/Storage audit, physical-media
 erasure proof, controlled cleanup-failure test or phone/outdoor validation.
 
+Later validation report: tested post-delete app/API paths and failure/stale-response
+checks are as expected; phone flow/camera fix works and a real outing/real-note
+search are done. Direct database/Storage checks were explicitly skipped. Do not
+include those direct checks in the reported post-delete pass or infer physical
+Storage erasure/controlled-cleanup-failure success from this aggregate report.
+
 ## 1. Apply migration0005 once
 
 Prerequisites: earlier0001–0004 migrations and existing working spot visibility/

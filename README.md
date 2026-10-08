@@ -35,15 +35,24 @@ implemented, along with local MiniLM semantic search, explored-state API/control
 private report submission and protected local operator CLI. The user confirms the
 listed reporting activation/check workflow and operator deletion worked with
 other spots unaffected; no independent SQL/Storage audit is implied. Both apps
-typecheck/build; backend 137 tests and frontend 56 tests pass. Actual local synthetic retrieval
+typecheck/build; backend137 last passed and frontend62 tests pass. Actual local synthetic retrieval
 found expected spots for 11/11 positive queries versus 7/11 for simple keywords;
 these are small fixture results, not pilot-corpus or live authorization evidence.
 User reports live auth/sharing, owner/connection photos, deletion and unconnected
 private-denial/Public-detail access, Public loading and saved-radius exclusion/
 reload persistence and listed semantic-query/radius-reduction smoke checks working.
 Listed explored activation/persistence/two-account checks are also user-confirmed.
-Broader direct SQL/RLS/Storage/security, revocation, full removal/failure-recovery
-checks and phone checks remain pending. Native wrapping is unimplemented. Packages
+The latest user report confirms the tested access matrix, Public-to-Connections
+revocation, post-delete app/API paths and failure/stale-response checks as expected.
+Phone flow/camera-return fix works; a real outing and real-note search are done.
+Direct database/Storage were initially skipped. Subsequent ordinary-user direct
+spots SELECT checks are user-confirmed: B reads an accessible row; non-owner C
+reads Public but receives zero rows/no error for Connections-only, with matching
+detail/photo200 versus404. Direct Storage and forbidden database/Storage writes
+remain unverified. Independent RLS/grant/
+media-erasure audits, exact SQL boundaries and controlled failure tests remain
+pending; no new real-query quality/latency metrics or demo evidence were supplied.
+Native wrapping is unimplemented. Packages
 were installed by the user. Earlier DevRelay setup below is historical context,
 not proof of application functionality.
 

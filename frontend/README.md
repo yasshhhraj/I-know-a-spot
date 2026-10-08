@@ -42,10 +42,10 @@ The demo is online-only. Account creation/enrollment and RLS are operator/backen
 
 ## Current build caveat
 
-Latest lead checks: typecheck/build and **56 tests** pass. The enrolled workspace
+Latest lead checks: typecheck/build and **62 tests** pass. The enrolled workspace
 loads through React.lazy/Suspense and a scoped failure boundary; a failed chunk
 offers a deliberate page reload while sign-out remains outside the boundary.
-Build output is426.97 kB entry JS +205.21 kB workspace, with no >500 kB warning.
+Build output is427.22 kB entry JS +205.21 kB workspace, with no >500 kB warning.
 These are build measurements, not verified browser performance. Unicode response
 limits match backend code points; HTML maxLength remains conservative for emoji.
 Use [../SPOT_SHARING_SETUP.md](../SPOT_SHARING_SETUP.md) for the unrun live checks.
@@ -75,3 +75,12 @@ Local production builds with Vite 7.1.9 / Rollup 4.64.1 hung in the optimizer pa
 and minification still run, but unused code remains. The original build command
 passes with this workaround. Revisit optimization before release; do not change
 dependency versions or claim the upstream issue is fixed without verification.
+
+Camera-return fix: identical user/token SIGNED_IN refocus notifications no longer
+emit verifying and unmount the Add form. Changed sessions and explicit access
+rechecks still fail-closed; no persistent draft/photo storage.6 controller regression
+tests cover duplicates/pending checks/rechecks/changed identity/sign-out/disposal.
+The user now confirms camera return and the tested phone flow work as expected.
+Regression steps are in ../SPOT_SHARING_SETUP.md. This is user-reported handset
+success, not full browser-discard draft recovery or an independent security audit;
+the latest report explicitly skipped direct database/Storage checks.

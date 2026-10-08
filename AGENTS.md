@@ -7,14 +7,21 @@ Read `PRD.md`, `BUILD_SCOPE_36H.md`, and `WORKBOARD.md` before implementation.
 The release includes Connections/Public feeds, a top-center feed switch, saved
 Public radius, browser photo capture/selection, directions, and explored state.
 Auth/sharing, Connections/Public feed/radius, MiniLM search, explored and reporting have local tests.
-The user reports live auth/sharing/detail audience, core Public/radius, and listed
-semantic-query/radius-reduction smoke checks working. Direct SQL radius/RLS,
-Storage, broader search authorization/revocation and browser/phone checks remain
-pending. Explored's listed activation/persistence/two-account browser checks are
-user-confirmed; direct SQL/RLS, revocation/tombstone/cascade and phone checks remain
-pending. Reporting/operator CLI's five-step activation/report/dedup/private queue/
-check workflow and explicit operator deletion with other spots unaffected are
-user-confirmed; independent SQL/Storage/every-path/failure audits remain pending.
+The user reports live auth/sharing, Public/radius, listed semantic queries,
+explored persistence/two-account state and reporting/operator workflow working.
+Latest validation: access matrix, Public-to-Connections revocation, tested
+post-delete app/API paths, failure/stale-response checks and phone flow as expected;
+camera-return fix confirmed, real outing and real-note search done. Direct database/
+Storage were initially skipped; sampled ordinary spots SELECT is now user-confirmed:
+B reads an accessible row; non-owner C reads Public (one row, API/photo200) and
+Connections-only is filtered (zero rows/no error, API/photo404). Direct Storage
+and forbidden table/Storage writes remain unverified. Independent SQL/RLS/grant/cascade,
+exact radius and controlled failure/media-erasure audits remain pending; do not
+infer them from browser results or invent real-query metrics/outdoor evidence.
+Exact same-user/token SIGNED_IN refocus no longer remounts the workspace (62
+frontend tests), with handset success user-confirmed. Full browser-discard draft
+recovery is not implemented. New tokens/account changes/explicit access checks
+must remain fail-closed.
 Read API_CONTRACT.md plus
 SUPABASE_SETUP.md, SPOT_SHARING_SETUP.md, PUBLIC_DISCOVERY_SETUP.md and
 SEMANTIC_SEARCH_SETUP.md, EXPLORED_SETUP.md and REPORTING_SETUP.md for user-run external steps. Search uses in-memory vectors;
