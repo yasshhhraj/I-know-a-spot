@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import { isSupabasePublishableKey } from './publicKey'
 
 let client: SupabaseClient | undefined
 
@@ -9,8 +10,8 @@ export function getSupabaseClient(): SupabaseClient {
     const url = import.meta.env.VITE_SUPABASE_URL
     const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
-    if (!url || !key || url.includes('YOUR_PROJECT') || key.includes('YOUR_PUBLIC')) {
-      throw new Error('Set public Supabase URL and publishable key in frontend/.env.local')
+    if (!url || url.includes('YOUR_PROJECT') || !isSupabasePublishableKey(key)) {
+      throw new Error('Set a public Supabase URL and sb_publishable_ key in frontend/.env.local')
     }
 
     client = createClient(url, key)

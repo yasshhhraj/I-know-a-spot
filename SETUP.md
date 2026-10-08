@@ -2,17 +2,24 @@
 
 ## What exists now
 
-- `frontend/`: React/TypeScript/Vite + Tailwind static-buildable scaffold.
-- `backend/`: Node/TypeScript/Fastify scaffold with `GET /health` returning
-  `{"status":"scaffold"}` and basic health/config tests.
-- Auth/data/storage, maps, Sharp, and Transformers.js packages are declared for
-  implementation, not integrated. No sign-in, spot/photo flow, feed, radius, AI,
-  database policies, or native app is ready yet.
+- `frontend/`: React/TypeScript/Vite + Tailwind, pilot email/password sign-in,
+  session restoration/sign-out, protected profile gate, sharing form, Leaflet pin
+  picker, Connections preview, protected photos, owner edits/deletion and directions;
+  static-buildable. The sharing workspace is lazy-loaded with a failure boundary.
+- `backend/`: Node/TypeScript/Fastify with `GET /me` verifying caller/enrollment;
+  authenticated spot/detail/media and owner create/edit/delete endpoints;
+  `GET /health` still reports `{"status":"scaffold"}`, not service readiness.
+- Supabase migrations are prepared, never executed by the assistant. User-reported
+  live auth is partial evidence; direct RLS and spot/Storage setup remain unverified.
+  See [SUPABASE_SETUP.md](SUPABASE_SETUP.md) and
+  [SPOT_SHARING_SETUP.md](SPOT_SHARING_SETUP.md) for user-run steps.
+- Full Connections/Public feed/map switch, radius editing/discovery area, AI,
+  explored state, reporting and native app are not implemented.
 - `AGENTS.md`, scoped AGENTS files, `.opencode/agents/`, and `WORKBOARD.md` provide
   local agent workflow. Existing DevRelay skills/configuration are preserved.
 
-The assistant did not install packages, download model weights, create real env
-files, provision Supabase, initialize native projects, start servers, or deploy.
+The assistant did not install packages, download model weights, create/edit real
+env files, apply SQL, provision Supabase, initialize native projects, or deploy.
 
 ## Runtime
 
@@ -38,11 +45,13 @@ npm install
 cp -n .env.example .env.local
 npm run typecheck
 npm run build
+npm test
 npm run dev
 ```
 
 `cp -n` preserves an existing file rather than overwriting it. Configure public
-values locally as needed. The scaffold page does not require Supabase credentials.
+values locally as needed. Sign-in needs public Supabase/API configuration; missing
+values display a configuration state rather than pretending login is available.
 Development URL: **http://localhost:5173**. `npm run preview` previews a successful
 build; `dist/index.html` and assets are the later Capacitor packaging input.
 
@@ -78,9 +87,13 @@ Expected scaffold response: `{"status":"scaffold"}`. After a successful build,
 the same port. Ctrl-C stops a running server.
 
 Backend uses Node's env-file flag; no dotenv package is required. Active settings
-are `PORT`, `HOST`, and `FRONTEND_ORIGIN`. Supabase/model example settings are
-placeholders and remain unused at scaffold stage. Keep real keys only in local
-server configuration; do not send them in chat or commit them.
+are `PORT`, `HOST`, and `FRONTEND_ORIGIN`, plus `SUPABASE_URL` and
+`SUPABASE_PUBLISHABLE_KEY` for `/me`. Use a new sb_publishable_ key; secret keys
+and legacy JWTs are rejected as that configuration. Spot writes additionally require
+backend-only `SUPABASE_SECRET_KEY=sb_secret_...` (preferred) or a genuine unexpired
+legacy `SUPABASE_SERVICE_ROLE_KEY` JWT. `/me` does not use either privileged key.
+Keep keys in correct local configuration; don't send them in chat/commits. Follow
+SPOT_SHARING_SETUP.md before enabling sharing against your project.
 
 Model dependencies include inference tooling, but application code does not load
 or download a model. Model acquisition/revision/license/resource validation is
@@ -144,6 +157,33 @@ retained, making bundles larger. This is a workaround, not a diagnosed upstream
 fix; investigate/restore optimization on a verified toolchain before release.
 No package versions were changed during this verification.
 
-No frontend test/lint script or browser suite exists yet. Browser/native behavior,
-external integrations, and product features remain unverified. Add meaningful
-tests with actual features, not empty scripts. See WORKBOARD.md for next work.
+### Authentication implementation verification — October 7, 2026
+
+After the auth slice, both apps passed `npm run typecheck`, `npm run build`, and
+`npm test`: frontend 10 auth/API-state tests; backend 51 tests across 3 files.
+Backend uses injected/mocked Auth and PostgREST transports. Frontend tests run with
+Node's built-in runner and need no additional installed test package.
+
+No frontend lint or browser suite exists yet. The user subsequently reported live
+enrolled/unenrolled access and session restoration working. This is not an
+independent migration/RLS audit; sign-out/reload and direct database checks are
+still pending. See SUPABASE_SETUP.md and WORKBOARD.md.
+
+### Sharing implementation verification — October 7, 2026
+
+Lead reran `npm run typecheck && npm run build && npm test` in each app:
+- Backend: passed, 4 files / **73 tests**. Includes all spot-route enrollment gates,
+  spoofing/ownership boundaries, ambiguous writes/cleanup, and actual Sharp output
+  fixtures for JPEG/PNG/WebP orientation and metadata removal.
+- Frontend: passed, **22 tests**. Includes protected-media requests, stale account
+  scopes/object URLs, field/response validation, wrapped longitude and uncertain
+  mutation results. These are Node tests, not React/Leaflet browser tests.
+- Static frontend build: **3.01s**, entry JS **424.87 kB** (gzip 121.92), lazy
+  workspace **178.74 kB** (gzip 53.22); no >500 kB chunk warning. Earlier combined
+  sharing chunk was 601.87 kB. This is a split, not measured browser latency.
+  The tree-shaking workaround remains; no dependency versions changed.
+
+Spot/Storage migration, real upload/read/edit/delete, audience revocation, direct
+Storage/RLS, tile-failure and lazy-chunk recovery, camera/phone and directions
+checks are **unrun**. Use SPOT_SHARING_SETUP.md; no live photo-protection or full
+pilot-readiness claim follows from mocked transport and generated-image tests.

@@ -4,9 +4,13 @@ export interface ServerConfig {
   port: number;
   host: string;
   frontendOrigin: string;
+  supabaseUrl?: string;
+  supabasePublishableKey?: string;
+  supabaseSecretKey?: string;
+  supabaseServiceRoleKey?: string;
 }
 
-/** Only settings actually used by this scaffold are parsed. Never expose credentials. */
+/** Integration settings are optional at startup so /health remains scaffold-only. */
 export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const rawPort = env.PORT ?? '3001';
   if (!/^[0-9]+$/.test(rawPort)) {
@@ -39,5 +43,11 @@ export function readConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     throw new Error('FRONTEND_ORIGIN must be a single HTTP(S) origin');
   }
 
-  return { port, host, frontendOrigin: origin.origin };
+  return {
+    port, host, frontendOrigin: origin.origin,
+    ...(env.SUPABASE_URL ? { supabaseUrl: env.SUPABASE_URL } : {}),
+    ...(env.SUPABASE_PUBLISHABLE_KEY ? { supabasePublishableKey: env.SUPABASE_PUBLISHABLE_KEY } : {}),
+    ...(env.SUPABASE_SECRET_KEY ? { supabaseSecretKey: env.SUPABASE_SECRET_KEY } : {}),
+    ...(env.SUPABASE_SERVICE_ROLE_KEY ? { supabaseServiceRoleKey: env.SUPABASE_SERVICE_ROLE_KEY } : {}),
+  };
 }

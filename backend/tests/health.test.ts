@@ -25,4 +25,24 @@ describe('scaffold health endpoint', () => {
     expect(allowed.headers['access-control-allow-origin']).toBe('http://localhost:5173');
     expect(other.headers['access-control-allow-origin']).not.toBe('http://elsewhere.test');
   });
+
+  it('allows browser preflight for spot mutations and auth/content headers', async () => {
+    app = createApp(readConfig({ FRONTEND_ORIGIN: 'http://localhost:5173' }));
+    for (const method of ['POST', 'PATCH', 'DELETE'] as const) {
+      const response = await app.inject({
+        method: 'OPTIONS',
+        url: '/spots/test',
+        headers: {
+          origin: 'http://localhost:5173',
+          'access-control-request-method': method,
+          'access-control-request-headers': 'authorization,content-type',
+        },
+      });
+      expect(response.statusCode).toBe(204);
+      expect(response.headers['access-control-allow-origin']).toBe('http://localhost:5173');
+      expect(response.headers['access-control-allow-methods']).toContain(method);
+      expect(response.headers['access-control-allow-headers']?.toLowerCase()).toContain('authorization');
+      expect(response.headers['access-control-allow-headers']?.toLowerCase()).toContain('content-type');
+    }
+  });
 });

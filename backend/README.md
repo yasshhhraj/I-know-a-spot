@@ -1,10 +1,12 @@
-# I Know a Spot — backend scaffold
+# I Know a Spot — backend pilot API
 
-Node.js + TypeScript + Fastify. This is **setup only**: `GET /health` returns
-`{"status":"scaffold"}`. There is no sign-in, Supabase connection, database
-schema, photo upload/storage, spot feed, geographic filtering, or AI inference.
-The declared integration packages reserve the chosen stack; importing or
-installing them does not implement product requirements.
+Node.js + TypeScript + Fastify. `GET /health` still returns
+`{"status":"scaffold"}` (not integration readiness). `GET /me` verifies a
+Supabase user token and reads that user's pre-enrolled profile. A migration is
+provided but **has not been applied by this implementation**. Spot sharing and a
+Connections preview are implemented locally; Public radius feed, semantic search,
+explored state and reporting are separate unimplemented slices. This is not a
+verified working pilot.
 
 ## Local setup
 
@@ -13,7 +15,7 @@ From `backend/`:
 
 ```sh
 npm install
-cp .env.example .env
+cp -n .env.example .env
 npm run dev
 ```
 
@@ -25,8 +27,16 @@ The server binds `127.0.0.1:3001` by default. `PORT` must be 1–65535;
 The `.env` file is loaded by Node's `--env-file-if-exists` flag in dev/start;
 shell-provided environment variables take precedence. Do not commit `.env`.
 
-The example Supabase URL and service-role key are **placeholders**, unused by
-this scaffold. Keep real service-role credentials on the server only. `MODEL_ID`
+Set `SUPABASE_URL` and a **new-format** `SUPABASE_PUBLISHABLE_KEY` beginning
+`sb_publishable_` to enable `/me`. The suffix must be nonempty and contain only
+ASCII letters, digits, `_` or `-`. Missing/malformed settings, `sb_secret_`
+keys, and legacy JWT keys return 503 before any `/me` provider request. Spot
+reads use the same publishable key and caller JWT. Spot mutations additionally
+require a **server-only** `SUPABASE_SECRET_KEY=sb_secret_...` (preferred), or a
+genuine unexpired `SUPABASE_SERVICE_ROLE_KEY` JWT with `service_role` (legacy).
+Do not supply user tokens or expose either admin key to the browser. Config is
+shape-checked locally and validated by Supabase upon use; a missing/invalid admin
+key yields 503 for mutations without blocking `/me` or configured reads. `MODEL_ID`
 defaults in the example to `Xenova/all-MiniLM-L6-v2` and `MODEL_CACHE_DIR` to
 `.cache/models`, but neither is read, loaded, or downloaded yet. Confirm the
 model's exact revision/license and runtime before implementing inference.
@@ -43,19 +53,151 @@ npm start
 ```
 
 `npm start` serves the compiled `dist/server.js` after a successful build;
-stop it with Ctrl-C. The tests inject HTTP requests without opening a listening
-socket and check scaffold health, CORS origin, and port/host/origin validation.
-No integration tests or product-feature checks exist yet.
+stop it with Ctrl-C. Tests inject HTTP requests without opening a listening
+socket, including mock-transport Supabase Auth/PostgREST boundary checks. These
+do not prove live remote configuration, applied policies, or live RLS behavior.
+
+## Safe API response logging
+
+The backend emits one JSON log line after every request completes, including
+unknown routes and errors. Example:
+
+```json
+{"event":"api_response","requestId":"req-1","method":"POST","route":"/spots","status":503,"durationMs":412}
+```
+
+The log contains only request ID, method, route template, status and elapsed
+milliseconds. It does not log authorization headers, tokens, request bodies,
+multipart fields, photo bytes, coordinates or query strings. For a quick uncertain
+save, inspect the backend terminal for the matching `POST /spots` or
+`PATCH /spots/:id` status and duration. A fast `503` points to a backend/provider
+failure; a duration near the client mutation deadline points to a timeout. Do not
+paste log lines containing private infrastructure identifiers into chat.
+
+The API explicitly permits browser preflight for `POST`, `PATCH` and `DELETE`
+with `Authorization` and `Content-Type`. A preflight `204` without a subsequent
+mutation log indicates the browser rejected the preflight response or the request
+was blocked before dispatch; inspect the browser console and preflight headers.
+
+## Operator setup — user-run only
+
+1. In your own Supabase project, apply
+   `supabase/migrations/202610070001_pilot_members_connections.sql` once with
+   the SQL editor/operator role or your existing migration workflow. Do not
+   execute as `anon` or a pilot member. Then apply
+   `supabase/migrations/202610070002_spots_storage.sql` **once**, after 0001,
+   with the operator role. The second migration creates the spots table, narrow
+   client SELECT grants, SQL visibility helpers and a private `spot-photos` bucket
+   with restrictive Storage guards. It deliberately fails if that bucket already
+   exists; inspect a conflict rather than repurposing data. No migration or SQL
+   was executed by this change. No users are automatically enrolled and no
+   trigger copies Auth metadata.
+2. In Supabase Auth, create 3–5 pilot accounts with consent using your normal
+   account-creation process. Disable public signups in your Auth settings for a
+   pre-enrolled pilot. Save their Auth UUIDs privately; do not commit passwords,
+   emails, or UUIDs of real members to fixtures.
+3. As the operator only, enroll chosen users with private SQL, e.g. replace
+   placeholders **privately** in the SQL editor:
+
+   ```sql
+   insert into public.pilot_members (user_id, display_name, enrolled)
+   values ('<existing-auth-user-uuid>'::uuid, 'Pilot member', true);
+   ```
+
+   Unspecified enrollment defaults to false; the name is fixed for members.
+   Seed each consented pair once in canonical UUID order:
+
+   ```sql
+   insert into public.connections (member_a, member_b)
+   values (least('<first-auth-uuid>'::uuid, '<second-auth-uuid>'::uuid),
+           greatest('<first-auth-uuid>'::uuid, '<second-auth-uuid>'::uuid));
+   ```
+
+4. For boundary checks, use **three distinct disposable Auth users without member
+   rows**, a trusted operator `psql` connection, and the supplied rollback-only
+   script. Substitute the three UUID placeholders locally; never put the DB
+   connection string/password in source or shell history. The script uses a
+   transaction and ends in `ROLLBACK`; `ON_ERROR_STOP` stops on failure. A
+   connection interruption while a transaction is open also rolls it back.
+
+   ```sh
+   psql -X -v ON_ERROR_STOP=1 \
+     -v member_a=REPLACE_WITH_DISPOSABLE_AUTH_UUID_A \
+     -v member_b=REPLACE_WITH_DISPOSABLE_AUTH_UUID_B \
+     -v outsider=REPLACE_WITH_DISPOSABLE_AUTH_UUID_C \
+     -f supabase/check_pilot_boundaries.sql
+   ```
+
+   This checks grants, constraints and simulated authenticated RLS claims, not
+   actual user JWT delivery. Also manually verify with two real signed-in
+   accounts that `/me` returns only each user's own profile, that unenrolled
+   identities receive 403, and that direct user-scoped table requests obey RLS.
+   No live SQL or sign-in has been run by this code change.
+
+`GET /me` requires `Authorization: Bearer <Supabase user access token>` (the
+Bearer scheme is case-insensitive; exactly one space and a token68 value) and
+returns `{ "profile": { "id": "...", "displayName": "...", "publicRadiusKm": 5 } }`
+for an enrolled account. Errors: 401 `UNAUTHORIZED` for missing/invalid/expired
+tokens; 403 `NOT_ENROLLED` for verified users with absent/unenrolled profiles;
+503 `SERVICE_UNAVAILABLE` for missing config or upstream/schema failures. Every
+response sets `Cache-Control: private, no-store`. The API creates a new
+publishable-key Supabase client per request, verifies with `auth.getUser(token)`,
+then forwards that token to PostgREST for an RLS-scoped own-row SELECT. No
+service-role lookup, shared session, or token logging is used. Requests time out
+at the transport after five seconds per fetch. CORS alone never authorizes.
+
+## Spot API and limits
+
+Every spot route requires verified enrollment. `POST /spots` accepts exactly a
+`data` JSON field and `photo` file in multipart form (either order); the full
+metadata object is `{title,note,audience,latitude,longitude,accessConfirmed,accessNote}`.
+`PATCH /spots/:id` accepts the same full JSON metadata without a photo. Title
+1–80 characters, note 1–500, access note 0–200, audience `connections` or
+`public`, finite coordinates within ±90/±180, `accessConfirmed: true`. The
+author/owner and UUID are generated by the server. Only owners can patch/delete;
+unknown/non-owned/hidden targets return neutral 404. `GET /spots` is **only**
+a newest-first Connections preview (up to 50), not Public discovery.
+`GET /spots/:id` permits any enrolled user for Public, owner/connected enrolled
+users for Connections. `GET /spots/:id/photo` rechecks visibility and returns
+clean WebP with `private, no-store` and `nosniff`; `photoUrl` is a relative API
+path, not a signed or public Storage URL. Browser clients must fetch it using
+Bearer auth and revoke local object URLs on account change. Already downloaded
+bytes cannot be recalled.
+
+Photo input is one JPEG/PNG/WebP of at most 10 MiB. The backend checks declared
+MIME against decoded format, rejects animation/multipage and more than 20 million
+pixels, rotates EXIF orientation, resizes within 1600×1600, and emits new WebP
+quality 80 without original metadata. No raw upload reaches Storage. `DELETE`
+tombstones first; failed object cleanup returns `MEDIA_CLEANUP_PENDING` (503),
+keeping ordinary access hidden so the owner can deliberately retry. On insert
+failure orphan cleanup is attempted only for a definitive PostgreSQL data/constraint
+rejection, after a fresh admin lookup finds no row. A timeout/transport/unknown
+result retains the object, even if an immediate lookup would be absent, because
+the INSERT might still commit. Operator inspection is required for settled orphans.
+No mutation is automatically retried after uncertain provider results.
+
+Error envelope: `{ "error": { "code": "...", "message": "..." } }`.
+401 `UNAUTHORIZED`, 403 `NOT_ENROLLED`, 400 `BAD_REQUEST`, 404 `NOT_FOUND`,
+413 `PHOTO_TOO_LARGE`, 415 `UNSUPPORTED_PHOTO`, 503 `SERVICE_UNAVAILABLE` or
+`MEDIA_CLEANUP_PENDING`. Safe responses never contain provider errors/keys.
+The reads rely on live RLS and Storage policies, not CORS. Before any pilot use,
+the operator must verify these policies remotely with separate enrolled connected,
+enrolled unconnected, and unenrolled user tokens, including direct Storage
+requests, audience revocation, tombstones and object cleanup. Local mocked tests
+do **not** establish that the migration was applied or that remote RLS works.
+
+See [../SPOT_SHARING_SETUP.md](../SPOT_SHARING_SETUP.md) for the operator-run
+migration/configuration, direct API/Storage matrix and cleanup procedure. Latest
+lead checks: typecheck/build and 4 files / 73 tests pass locally; remote checks unrun.
 
 ## Future boundaries
 
 Follow the root `PRD.md` and `BUILD_SCOPE_36H.md` for the pilot. Before enabling
-spots or search, implement individual pilot authentication and enforce audience
-and ownership for direct reads, media, and writes on the server. A CORS header
-is not authorization. Do not claim Supabase row-level security until actual
-policies have been written and tested; do not create custom authentication.
+future Public discovery or search, enforce audience and ownership for direct
+reads, media and writes on the server. A CORS header is not authorization. Do
+not claim live Supabase row-level security until policies are applied and tested.
 Public discovery uses the member's saved radius and explicit request center;
 filter eligible spots by geodesic straight-line distance **before** semantic
 ranking. Do not send photos, coordinates, or member IDs into the text encoder.
-The current health endpoint deliberately cannot indicate readiness of those
-future services.
+The health endpoint deliberately does not indicate readiness of these or future
+services.

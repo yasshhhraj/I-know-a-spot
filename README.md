@@ -6,14 +6,25 @@ Mobile-web pilot with a later Capacitor path. See [PRD.md](PRD.md), the
 [36-hour build plan](BUILD_SCOPE_36H.md), and [future scope](FUTURE_SCOPE.md).
 
 - [SETUP.md](SETUP.md): manual install/environment/run/check commands.
-- [frontend/](frontend/): React/TypeScript/Vite scaffold (port 5173).
-- [backend/](backend/): Node/TypeScript/Fastify scaffold (port 3001).
+- [SUPABASE_SETUP.md](SUPABASE_SETUP.md): user-run migration, account enrollment,
+  and live auth/RLS verification steps.
+- [SPOT_SHARING_SETUP.md](SPOT_SHARING_SETUP.md): user-run spot/private-Storage
+  migration, backend-only admin configuration and live audience/media checks.
+- [API_CONTRACT.md](API_CONTRACT.md): protected profile and spot/media API contract.
+- [frontend/](frontend/): React/TypeScript/Vite app (port 5173).
+- [backend/](backend/): Node/TypeScript/Fastify API (port 3001).
 - [AGENTS.md](AGENTS.md) and [WORKBOARD.md](WORKBOARD.md): bounded agent workflow.
 - `.opencode/agents/`: frontend/backend implementation agent definitions.
 
-**Scaffold only:** no completed auth, feeds, photos, AI, or native wrapping.
-Packages are declared; the user installs them. The earlier DevRelay setup below
-is preserved as historical context, not evidence that the application works.
+**Incomplete pilot, locally tested:** auth plus photo/pin/note/audience sharing,
+Connections preview, protected photo retrieval, detail/directions and owner
+metadata edits/deletion are implemented. Both apps typecheck/build; backend
+73 tests and frontend 22 tests pass. User-reported enrolled/unenrolled login and
+session restoration work; spot/Storage migration and live media/RLS/browser checks
+are still pending. Public feed/switch, radius editing/manual discovery center,
+AI, explored state, reporting and native wrapping are unimplemented. Packages
+were installed by the user. Earlier DevRelay setup below is historical context,
+not proof of application functionality.
 
 An OmniRush.ai workspace configured for DEV community article research through
 the DEV/MLH DevRelay gateway at [devrelay.com](https://devrelay.com/).

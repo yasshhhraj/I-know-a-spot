@@ -1,6 +1,6 @@
-# I Know a Spot — frontend scaffold
+# I Know a Spot — frontend pilot sharing slice
 
-React + TypeScript + Vite mobile-web scaffold, with Tailwind CSS v4, Leaflet / React Leaflet, and a lazy Supabase JS client dependency. This is **setup only**: the displayed page makes no API requests, and there are no working feeds, authentication, maps, photo uploads, or AI search yet. Product requirements are in [../PRD.md](../PRD.md), the current release plan in [../BUILD_SCOPE_36H.md](../BUILD_SCOPE_36H.md), and deferred work in [../FUTURE_SCOPE.md](../FUTURE_SCOPE.md).
+React + TypeScript + Vite mobile web app with Tailwind CSS v4, Leaflet and Supabase Auth. Pre-created pilot accounts can sign in and verify enrollment with `GET /me`. For an enrolled account the spot workspace offers a **Connections preview** (up to 50, newest first), create/edit/delete, protected photo display, detail by `?spot=<id>`, and external directions. This is an incomplete pilot: there is **no Public feed/switch, radius or manual discovery-area editor, AI search, explored state, or reporting UI**. Product requirements are in [../PRD.md](../PRD.md) and the current release plan in [../BUILD_SCOPE_36H.md](../BUILD_SCOPE_36H.md).
 
 ## Local setup
 
@@ -9,32 +9,45 @@ From `frontend/`:
 
 ```sh
 npm install
-cp .env.example .env.local
+cp -n .env.example .env.local
 npm run dev
 ```
 
-The Vite development URL is `http://localhost:5173` (port 5173). The anticipated backend is separate, at `http://localhost:3001`; its only anticipated endpoint at setup time is `GET /health`. The scaffold does not call it. Configure `VITE_API_BASE_URL` in `.env.local` for later API integration. The public Supabase URL and **publishable** key placeholders can be filled when the corresponding project is available; the current page renders without them because the client factory is lazy.
+The Vite development URL is `http://localhost:5173`. Configure `VITE_API_BASE_URL` for the separate backend (locally `http://localhost:3001`), plus the public Supabase project URL and a new-format **`sb_publishable_`** key. Missing settings or a key of another family show a configuration state, not a fake login. The backend must implement the agreed [auth and spot contract](../API_CONTRACT.md), trust only a verified Bearer user token, and enroll accounts separately; this frontend gate alone does not grant access. From a phone, `localhost` refers to the phone, so set reachable HTTPS/LAN service origins and allowed CORS origins accordingly.
 
 For checks and a static production bundle, still from `frontend/`:
 
 ```sh
 npm run typecheck
 npm run build
+npm test
 npm run preview
 ```
 
-`npm run build` typechecks and writes static assets under `dist/`, including `index.html`, for a web deployment and later Capacitor packaging. `npm run preview` serves a local preview of an existing build. Install dependencies yourself before running checks; none are installed by this scaffold. If connecting from a phone later, the server must be made reachable on your LAN and API/Supabase origins configured for that device; `localhost` refers to the device itself.
+`npm run build` typechecks and writes static assets under `dist/`, including `index.html`, for a web deployment and later Capacitor packaging. `npm test` runs Node's built-in test runner over auth/API boundary tests. `npm run preview` serves an existing build. Install dependencies yourself before running checks.
 
 ## Configuration boundaries
 
-- `src/config.ts` centralizes the API base from `VITE_API_BASE_URL`; future requests should use that value instead of hardcoded origins.
-- `src/supabase.ts` creates a browser client only when a future feature requests it and both public settings are provided. It is not an authentication implementation.
-- `VITE_` values are bundled into browser assets. Only public Supabase project URL and publishable key belong here; never add a secret/service-role key. Audience and ownership checks belong on the backend, not in hidden frontend controls.
-- Leaflet and React Leaflet are declared for later map work. Add Leaflet CSS and any marker assets when implementing an actual map; none is rendered by this scaffold.
+- `src/config.ts` centralizes the API base from `VITE_API_BASE_URL`; `/me`, spot metadata and photos use this base. No API URL defaults to the web origin. The optional `VITE_MAP_TILE_URL` and `VITE_MAP_TILE_ATTRIBUTION` are **public** map-service settings; absent a custom tile URL, Leaflet requests OpenStreetMap tiles with visible OpenStreetMap attribution. For another provider, configure its correct attribution, permission to use its service, and HTTPS tile URL. Map/tile providers and Google Maps directions receive destination/map coordinates independently of the app API. Do not put tokens or private user data in tile URL templates.
+- `src/supabase.ts` lazily creates a browser auth client from the public settings. Supabase persists the local browser session; `getSession` is only a bootstrap, not enrollment proof. An auth-state listener invalidates stale profile checks when the account or token changes. Sign-out uses `{scope:'local'}` (this browser), not global revocation.
+- `/me` is sent with a Bearer user access token and `no-store`, with a 15-second timeout and caller abort on account changes/sign-out. Only a validated profile matching the current auth user reaches the welcome view. 401 asks for sign-in, 403 denies access, and a 503, timeout, network failure or malformed response keeps access hidden with a retry option and without signing the browser out.
+- `VITE_` values are bundled into browser assets. Only public Supabase project URL and `sb_publishable_` key belong here; never add a secret/service-role key. The key-family runtime guard **does not** prevent exposure if a privileged key was accidentally bundled; rotate any exposed credential. Audience and ownership checks belong on the backend, not in hidden frontend controls.
+- Enrolled workspace operations obtain a fresh Supabase session outside auth callbacks, require its user ID to match the gated profile, and send the token in `Authorization: Bearer` rather than query parameters. A 401/403 hides the workspace and rechecks `/me`. Pending requests are aborted/ignored on workspace unmount or account/token change; blob URLs are revoked on replacement/unmount. These browser measures are **not** server authorization. Backend audience/owner/RLS rules must protect all direct spot and private-media reads/writes.
+- The form requires a chosen map pin (no default location), title/note/access confirmation and one photo on creation. Numeric latitude/longitude inputs provide a keyboard path if tiles or map interaction fail. Camera capture is a separate browser file input where supported; the ordinary picker remains available. Client type/size checks are hints: the server validates image bytes, dimensions, animation and strips EXIF before storing a clean derivative. Existing photos cannot be replaced through edit in this slice.
+- POST uses multipart `data` JSON plus `photo`; PATCH sends the full metadata object as JSON without a photo. Failed forms retain inputs in that screen session. On uncertain timeout/network writes the app does not retry automatically; check the refreshed preview and open possible matches before explicitly resubmitting. DELETE 204 removes the item; `MEDIA_CLEANUP_PENDING` hides it and offers an explicit deletion retry, **not** a claim that photo bytes are gone. A deleted photo already downloaded by another device cannot be recalled.
+- Reads use a 15-second browser deadline; POST/PATCH/DELETE mutations use a bounded 35-second deadline because backend verification and ordered Storage/database work can exceed 15 seconds. A timeout still leaves the outcome unknown; a deployed proxy or provider can impose another deadline. No automatic retry is performed.
 
-The future demo is online-only. Native Capacitor packaging, browser/device integration, and application flows are separate implementation steps.
+The demo is online-only. Account creation/enrollment and RLS are operator/backend responsibilities. Prepared SQL/storage migrations are not proof of deployed policies: the operator must apply them, configure the backend-only admin secret privately, and complete three-account connected/unconnected + signed-out direct API/media checks. Node tests/typecheck/build do not verify a running backend, a real browser/phone camera, Sharp's emitted image bytes, Storage policies, external tiles/directions, or a deployed Capacitor origin. Test selection and capture on pilot phones, then verify save/read/edit/delete and audience revocation live. Native Capacitor packaging and login-origin behavior remain later steps.
 
 ## Current build caveat
+
+Latest lead checks: typecheck/build and **22 tests** pass. The enrolled workspace
+loads through React.lazy/Suspense and a scoped failure boundary; a failed chunk
+offers a deliberate page reload while sign-out remains outside the boundary.
+Build output is 424.87 kB entry JS + 178.74 kB workspace, with no >500 kB warning.
+These are build measurements, not verified browser performance. Unicode response
+limits match backend code points; HTML maxLength remains conservative for emoji.
+Use [../SPOT_SHARING_SETUP.md](../SPOT_SHARING_SETUP.md) for the unrun live checks.
 
 Local production builds with Vite 7.1.9 / Rollup 4.64.1 hung in the optimizer path.
 `vite.config.ts` temporarily disables tree-shaking; typechecking, bundling, CSS,

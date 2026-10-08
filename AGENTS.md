@@ -6,7 +6,11 @@ Read `PRD.md`, `BUILD_SCOPE_36H.md`, and `WORKBOARD.md` before implementation.
 `FUTURE_SCOPE.md` is excluded unless the user explicitly changes scope.
 The release includes Connections/Public feeds, a top-center feed switch, saved
 Public radius, browser photo capture/selection, directions, and explored state.
-The workspace currently contains scaffolds, not those completed product flows.
+Auth and the spot-sharing/Connections-preview slice have local tests. The user
+reports live auth working, but direct RLS and spot/Storage/browser checks are still
+pending. Public feed/radius, AI, explored and reporting remain unimplemented.
+Read API_CONTRACT.md plus SUPABASE_SETUP.md and SPOT_SHARING_SETUP.md for user-run
+external steps; never mistake prepared migrations for applied policies.
 
 ## Stack and ownership
 
@@ -55,6 +59,7 @@ The workspace currently contains scaffolds, not those completed product flows.
 - `frontend/`: `npm run typecheck`, `npm run build`; `npm run dev` on port 5173.
 - `backend/`: `npm run typecheck`, `npm run build`, `npm test`;
   `npm run dev` on port 3001. `GET /health` returns scaffold status.
-- No frontend test/lint script or browser integration suite exists yet. Add a
-  meaningful check when its behavior is implemented; never add no-op scripts.
+- `frontend/`: `npm test` runs dependency-free Node auth/API-controller tests.
+  No frontend lint or browser integration suite exists yet. Add meaningful checks
+  as behavior is implemented; never add no-op scripts.
 - See `SETUP.md` for exact environment commands and current limitations.
