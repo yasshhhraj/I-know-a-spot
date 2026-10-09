@@ -38,10 +38,10 @@ jobs:
         run: npm install --global npm@11.8.0
 
       - name: Install dependencies
-        # npm 11.8.0 on the project runner rejects one transitive lockfile
-        # metadata entry as an empty version; local and CI installs are still
-        # pinned by package.json ranges, while the lockfile remains tracked.
-        run: npm install --no-audit --no-fund
+        # The existing lockfile contains legacy metadata that the hosted npm
+        # runner rejects as an empty version. Keep it tracked for local
+        # reproducibility, but let this static build resolve package.json.
+        run: npm install --package-lock=false --ignore-scripts --no-audit --no-fund
 
       - name: Typecheck
         run: npm run typecheck
