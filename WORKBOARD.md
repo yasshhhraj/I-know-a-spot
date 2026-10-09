@@ -95,9 +95,21 @@ Local tests do not prove remote RLS or a finished pilot.
 | CAMERA-RETURN | Prevent unchanged auth refocus from resetting Add form | frontend-builder `frontend/src/authController.ts`, `frontend/tests/auth.test.ts`; lead docs/checks | Completed (local; handset user-confirmed) | 62 frontend tests/typecheck/build pass; user reports camera fix works and phone flow as expected; new tokens/account changes/explicit rechecks still fail-closed; no full browser-discard recovery claim |
 | EXPLORED | Per-user self-reported explored state | Lead contract/SQL/docs; backend-builder `backend/src/`, `backend/tests/`; frontend-builder `frontend/src/`, `frontend/tests/` | Completed (local; listed live smoke user-confirmed) | 118 backend/46 frontend tests and typecheck/build pass; user confirms true/false persistence across reopen/reload/sign-in and independent account state; direct SQL/RLS and broader boundaries remain pending |
 | EXPLORED-LIVE | Apply migration0004 and verify persistence, isolation and removal boundaries | User then lead; EXPLORED_SETUP.md | Partial (user-reported quick checks passed) | Listed activation/browser persistence/two-account checks confirmed; no independent SQL receipts, direct table/RPC audit, revocation/tombstone/cascade or phone proof |
+| UI-FOUNDATION | First mobile-first visual revamp slice: Forest & Opal tokens, Spotmark branding, compact access shell, workspace navigation, cards and focused task surfaces | Lead; frontend/src/App.tsx, BrandMark.tsx, SpotWorkspace.tsx, ExploredControl.tsx, ReportControl.tsx, styles.css | Completed (local) | No API/auth/backend changes; frontend typecheck/build/test and `git diff --check` pass; production entry 429.52 kB and lazy workspace 211.34 kB; next slice is remaining discovery/area/editor details and phone review |
 | PILOT | Combined mobile/outdoor test and submission evidence | User then lead | Partial (phone/outing user-confirmed) | Tested phone flow as expected; real outing and real-note search done; direct database/Storage skipped, metrics/demo/submission artifacts and remaining checks not supplied; no unrequested publication |
 
 ## Handoff format
+
+### UI foundation slice — October 9, 2026
+
+- User authorized the frontend revamp. This first slice uses the existing Tailwind/native stack; no MUI or dependency installation was requested or performed.
+- Added Forest & Opal tokens, shared focus/button/field styles and safe-area helpers; added an inline Spotmark-style brand mark without external assets.
+- Reworked access presentation into a calm landing/sign-in layout and removed the enrolled-state pilot explanation from the first workspace screen. Enrolled users now get a compact header with sign-out and the same lazy workspace.
+- Restyled the workspace shell with Discover/Add spot/Profile navigation, a retained top-center Connections/Public switch, responsive spot cards, focused editor/profile/detail surfaces, and clearer access/explored/report sections.
+- Preserved auth state transitions, lazy loading, URL spot navigation, API calls, audience/radius/search behavior, camera-return safeguards and error/uncertain-write messaging. Backend/API/schema are unchanged.
+- Actual checks from `frontend/`: `npm run typecheck`, `npm run build`, `npm test`; 67 frontend tests passed. `git diff --check` passed. Build output: 429.52 kB entry and 211.34 kB lazy workspace (baseline 427.22 kB / 205.21 kB).
+- Follow-up: moved Discover/Add spot/Profile into an always-visible floating, safe-area-aware bottom navigation; selected feed/nav states now use dark forest text on mint instead of white-on-light; Reload Connections/Public and Save radius use explicit high-contrast primary styling; Add/Edit/Profile/Detail can be left through the same navigation. Discovery center now has an explicit Use current location action that stages coordinates and requires confirmation before Public results change, with permission/unsupported/timeout states.
+- Not yet done: real phone/browser visual review, remaining contextual area/editor extraction, map/list toggle, and broader redesign phases. No live/security readiness claim.
 
 ### Post-install checks — October 7, 2026
 

@@ -3,6 +3,7 @@ import { apiBaseUrl, hasApiConfig } from './config'
 import { getSupabaseClient } from './supabase'
 import { fetchMe } from './api'
 import { AuthController, type AuthView } from './authController'
+import { BrandMark } from './BrandMark'
 
 const SpotWorkspace = lazy(() => import('./SpotWorkspace').then(module => ({ default: module.SpotWorkspace })))
 
@@ -83,42 +84,50 @@ export default function App() {
   }
 
   const signingForm = view.kind === 'signedOut' || view.kind === 'expired' || view.kind === 'signingIn'
+  const enrolledProfile = view.kind === 'enrolled' ? view.profile : null
+  const enrolled = enrolledProfile !== null
   return (
-    <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-5 py-10 text-stone-900">
-      <p className="text-sm font-bold uppercase tracking-widest text-emerald-800">I Know a Spot</p>
-      <h1 className="mt-3 text-3xl font-bold tracking-tight">Pilot access</h1>
-       <p className="mt-3 leading-relaxed text-stone-700">Continue with Google or use an existing email/password account. Public spots are visible to authenticated members, not anonymous visitors.</p>
-      <section className="mt-7 rounded-2xl border border-stone-300 bg-white p-5 shadow-sm" aria-live="polite">
-        {configurationError && <><h2 className="text-xl font-semibold">Configuration needed</h2><p className="mt-2">The public Supabase or API settings are missing. Ask the pilot operator to configure this app.</p></>}
-        {!configurationError && (view.kind === 'restoring' || view.kind === 'verifying') && <><h2 className="text-xl font-semibold">{view.kind === 'restoring' ? 'Restoring session…' : 'Verifying pilot access…'}</h2><p className="mt-2 text-stone-700">Please wait.</p></>}
-        {!configurationError && signingForm && <>
-          <h2 className="text-xl font-semibold">{view.kind === 'expired' ? 'Session expired' : 'Sign in'}</h2>
-          {view.kind === 'expired' && <p className="mt-2">Your session could not be verified. Sign in again to continue.</p>}
-           {view.kind === 'signedOut' && view.credentialError && <p role="alert" className="mt-2 text-red-800">Those credentials were not accepted. Check your email and password and try again.</p>}
-           {view.kind === 'signedOut' && view.oauthError && <p role="alert" className="mt-2 text-red-800">Google sign-in could not be started. Check your connection and try again.</p>}
-          <form className="mt-4 space-y-4" onSubmit={submit}>
-            <div><label className="block font-medium" htmlFor="email">Email</label><input id="email" name="email" type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-stone-500 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" /></div>
-            <div><label className="block font-medium" htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-stone-500 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" /></div>
-            <button disabled={view.kind === 'signingIn' || !controller} className="min-h-12 w-full rounded-lg bg-emerald-800 px-4 py-3 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-60">{view.kind === 'signingIn' ? 'Signing in…' : 'Sign in'}</button>
-          </form>
-          <div className="my-4 flex items-center gap-3 text-sm text-stone-500"><span className="h-px flex-1 bg-stone-300" />or<span className="h-px flex-1 bg-stone-300" /></div>
-          <button type="button" disabled={view.kind === 'signingIn' || !controller} onClick={() => void controller?.signInWithGoogle()} className="min-h-12 w-full rounded-lg border border-stone-600 px-4 py-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-60">{view.kind === 'signingIn' ? 'Starting Google sign-in…' : 'Continue with Google'}</button>
-        </>}
-        {!configurationError && view.kind === 'enrolled' && <>
-          <h2 className="text-xl font-semibold">Welcome, {view.profile.displayName}</h2>
-           <p className="mt-3">Pilot membership verified.</p>
-            <p className="mt-3 text-stone-700">The workspace includes Connections and Public discovery, saved radius, semantic search, self-reported explored state and private spot reporting. Availability depends on the configured backend and pilot access; this is not a release-readiness check.</p>
-           <button onClick={() => void controller?.signOut()} className="mt-5 min-h-12 rounded-lg border border-stone-600 px-5 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700">Sign out</button>
-           <WorkspaceBoundary>
-             <Suspense fallback={<p role="status" className="mt-8">Loading spot workspace…</p>}>
-               <SpotWorkspace profile={view.profile} recheck={recheck} />
-             </Suspense>
-           </WorkspaceBoundary>
-        </>}
-        {!configurationError && view.kind === 'denied' && <><h2 className="text-xl font-semibold">Not enrolled</h2><p className="mt-2">This account is not enrolled in the pilot. Ask the operator for access; signing in alone does not grant it.</p><button onClick={() => void controller?.signOut()} className="mt-5 min-h-12 rounded-lg border border-stone-600 px-5 font-semibold">Sign out</button></>}
-        {!configurationError && view.kind === 'outage' && <><h2 className="text-xl font-semibold">Access temporarily unavailable</h2><p className="mt-2">We could not verify pilot access. Your local session has not been signed out. Please retry.</p><div className="mt-5 flex flex-wrap gap-3"><button onClick={() => controller?.retry()} className="min-h-12 rounded-lg bg-emerald-800 px-5 font-semibold text-white">Retry verification</button><button onClick={() => void controller?.signOut()} className="min-h-12 rounded-lg border border-stone-600 px-5 font-semibold">Sign out</button></div></>}
-        {!configurationError && (view.kind === 'signingOut' || view.kind === 'logoutFailed') && <><h2 className="text-xl font-semibold">{view.kind === 'signingOut' ? 'Signing out…' : 'Could not clear local session'}</h2>{view.kind === 'logoutFailed' && <><p className="mt-2">Access remains hidden. Retry signing out before using this app.</p><button onClick={() => void controller?.signOut()} className="mt-5 min-h-12 rounded-lg border border-stone-600 px-5 font-semibold">Retry sign out</button></>}</>}
-      </section>
+    <main className="app-canvas min-h-screen">
+      <div className={enrolled ? 'mx-auto w-full max-w-6xl px-4 pb-8 pt-4 sm:px-6 lg:px-8' : 'mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-8 px-4 py-8 sm:px-6 lg:flex-row lg:items-center lg:gap-16 lg:px-8'}>
+        <header className={enrolled ? 'flex items-center justify-between gap-4 border-b border-[var(--line)] pb-4' : 'max-w-xl'}>
+          <BrandMark />
+          {enrolled && <div className="flex items-center gap-3">
+            <span className="hidden text-sm text-[var(--ink-muted)] sm:inline">{enrolledProfile.displayName}</span>
+            <button type="button" onClick={() => void controller?.signOut()} className="button-secondary">Sign out</button>
+          </div>}
+        </header>
+        {!enrolled && <section className="max-w-xl">
+          <p className="mt-6 text-sm font-semibold uppercase tracking-[0.18em] text-[var(--forest-700)]">A map of small discoveries</p>
+          <h1 className="mt-3 text-4xl font-bold tracking-[-0.04em] text-[var(--forest-950)] sm:text-5xl">Small discoveries. A reason to go outside.</h1>
+          <p className="mt-5 max-w-lg text-lg leading-8 text-[var(--ink-muted)]">Share overlooked places with your connections. Find Public spots around an area you choose, and search by what you feel like seeing.</p>
+          <div className="mt-7 flex flex-wrap gap-3 text-sm text-[var(--ink-muted)]"><span className="rounded-full bg-[var(--opal-100)] px-3 py-2">Notice &amp; share</span><span className="rounded-full bg-[var(--opal-100)] px-3 py-2">Find by meaning</span><span className="rounded-full bg-[var(--opal-100)] px-3 py-2">Go &amp; explore</span></div>
+        </section>}
+        {enrolledProfile ? <WorkspaceBoundary>
+          <Suspense fallback={<p role="status" className="mt-8">Loading your spots…</p>}>
+            <SpotWorkspace profile={enrolledProfile} recheck={recheck} />
+          </Suspense>
+        </WorkspaceBoundary> : <section className="surface card w-full max-w-xl p-5 sm:p-7" aria-live="polite">
+          {configurationError && <><h2 className="text-2xl font-semibold text-[var(--forest-950)]">Configuration needed</h2><p className="mt-2 text-[var(--ink-muted)]">The public Supabase or API settings are missing. Ask the pilot operator to configure this app.</p></>}
+          {!configurationError && (view.kind === 'restoring' || view.kind === 'verifying') && <><h2 className="text-2xl font-semibold text-[var(--forest-950)]">{view.kind === 'restoring' ? 'Restoring session…' : 'Verifying pilot access…'}</h2><p className="mt-2 text-[var(--ink-muted)]">Please wait.</p></>}
+          {!configurationError && signingForm && <>
+            <h2 className="text-2xl font-semibold text-[var(--forest-950)]">{view.kind === 'expired' ? 'Session expired' : 'Sign in to explore'}</h2>
+            {view.kind === 'expired' && <p className="mt-2 text-[var(--ink-muted)]">Your session could not be verified. Sign in again to continue.</p>}
+            {view.kind === 'signedOut' && view.credentialError && <p role="alert" className="mt-3 rounded-xl bg-[var(--error-surface)] p-3 text-[var(--error-text)]">Those credentials were not accepted. Check your email and password and try again.</p>}
+            {view.kind === 'signedOut' && view.oauthError && <p role="alert" className="mt-3 rounded-xl bg-[var(--error-surface)] p-3 text-[var(--error-text)]">Google sign-in could not be started. Check your connection and try again.</p>}
+            <form className="mt-5 space-y-4" onSubmit={submit}>
+              <div><label className="field-label" htmlFor="email">Email</label><input id="email" name="email" type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} className="field-input" /></div>
+              <div><label className="field-label" htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className="field-input" /></div>
+              <button disabled={view.kind === 'signingIn' || !controller} className="button-primary w-full">{view.kind === 'signingIn' ? 'Signing in…' : 'Sign in'}</button>
+            </form>
+            <div className="my-5 flex items-center gap-3 text-sm text-[var(--ink-muted)]"><span className="h-px flex-1 bg-[var(--line)]" />or<span className="h-px flex-1 bg-[var(--line)]" /></div>
+            <button type="button" disabled={view.kind === 'signingIn' || !controller} onClick={() => void controller?.signInWithGoogle()} className="button-secondary w-full">{view.kind === 'signingIn' ? 'Starting Google sign-in…' : 'Continue with Google'}</button>
+            <p className="mt-5 text-sm leading-6 text-[var(--ink-muted)]">For pre-enrolled pilot members. Public posts are visible to other enrolled members.</p>
+          </>}
+          {!configurationError && view.kind === 'denied' && <><h2 className="text-2xl font-semibold text-[var(--forest-950)]">Not enrolled</h2><p className="mt-2 text-[var(--ink-muted)]">This account is not enrolled in the pilot. Ask the operator for access; signing in alone does not grant it.</p><button onClick={() => void controller?.signOut()} className="button-secondary mt-5">Sign out</button></>}
+          {!configurationError && view.kind === 'outage' && <><h2 className="text-2xl font-semibold text-[var(--forest-950)]">Access temporarily unavailable</h2><p className="mt-2 text-[var(--ink-muted)]">We could not verify pilot access. Your local session has not been signed out. Please retry.</p><div className="mt-5 flex flex-wrap gap-3"><button onClick={() => controller?.retry()} className="button-primary">Retry verification</button><button onClick={() => void controller?.signOut()} className="button-secondary">Sign out</button></div></>}
+          {!configurationError && (view.kind === 'signingOut' || view.kind === 'logoutFailed') && <><h2 className="text-2xl font-semibold text-[var(--forest-950)]">{view.kind === 'signingOut' ? 'Signing out…' : 'Could not clear local session'}</h2>{view.kind === 'logoutFailed' && <><p className="mt-2 text-[var(--ink-muted)]">Access remains hidden. Retry signing out before using this app.</p><button onClick={() => void controller?.signOut()} className="button-secondary mt-5">Retry sign out</button></>}</>}
+        </section>}
+      </div>
     </main>
   )
 }

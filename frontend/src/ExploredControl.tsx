@@ -4,7 +4,7 @@ import { exploredRequest } from './exploredApi'
 import { ExploredController, type ExploredState } from './exploredController'
 import { getSupabaseClient } from './supabase'
 
-const button = 'min-h-12 rounded-lg border border-stone-600 px-4 py-2 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50'
+const button = 'ui-button min-h-12 rounded-xl border border-[var(--control-outline)] px-4 py-2 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:opacity-50'
 
 export function ExploredControl({ memberId, spotId, recheck, onMissing }: { memberId: string; spotId: string; recheck: () => void; onMissing: () => void }) {
   const [state, setState] = useState<ExploredState>({ phase: 'loading', confirmed: null, message: 'Loading your explored state…' })
@@ -21,9 +21,9 @@ export function ExploredControl({ memberId, spotId, recheck, onMissing }: { memb
     return () => { current.dispose(); if (actions.current === current) actions.current = null }
   }, [memberId, spotId])
   const active = state.phase === 'ready' && state.confirmed !== null
-  return <section aria-label="Your explored state" className="rounded-lg border border-stone-300 p-3">
-    <h5 className="font-semibold">Explored (self-reported)</h5>
-    <p className="text-sm">Only your own mark is shown. This is voluntary, not a verified visit: no GPS proof, public counts or rankings.</p>
+  return <section aria-label="Your explored state" className="rounded-xl border border-[var(--line)] bg-[var(--surface-muted)] p-4">
+    <h5 className="font-semibold text-[var(--forest-950)]">Explored (self-reported)</h5>
+    <p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">Only your own mark is shown. This is voluntary, not a verified visit: no GPS proof, public counts or rankings.</p>
     <p role={state.phase === 'error' || state.phase === 'uncertain' || (state.phase === 'ready' && state.message.includes('invalid')) ? 'alert' : 'status'} aria-live="polite" className="mt-2">{state.message}</p>
     {state.phase === 'uncertain' && <p className="text-sm">The last confirmed value may be outdated. A reload shows a current snapshot, not proof that an in-flight write cannot complete later.</p>}
     <div className="mt-3 flex flex-wrap gap-2">
