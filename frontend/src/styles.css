@@ -88,7 +88,7 @@ button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
 .workspace-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
 .workspace-kicker { color: var(--primary); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
 .workspace-nav { position: fixed; z-index: 1000; bottom: max(0.75rem, env(safe-area-inset-bottom)); left: 50%; display: grid; width: min(calc(100% - 2rem), 34rem); grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; padding: 0.4rem; border: 1px solid var(--line); border-radius: 1.1rem; background: rgb(255 255 255 / 0.94); box-shadow: 0 14px 34px rgb(23 44 37 / 0.16); backdrop-filter: blur(16px); transform: translateX(-50%); }
-.nav-item { min-height: 3rem; border: 0; border-radius: 0.75rem; background: transparent; color: var(--ink-muted); cursor: pointer; font-weight: 700; }
+.nav-item { display: inline-flex; min-height: 3rem; align-items: center; justify-content: center; gap: 0.4rem; border: 0; border-radius: 0.75rem; background: transparent; color: var(--ink-muted); cursor: pointer; font-weight: 700; }
 .nav-item[aria-current="page"] { background: var(--opal-100); color: var(--forest-950); }
 .nav-item:hover { background: var(--surface-muted); color: var(--forest-950); }
 .spot-card { overflow: hidden; border: 1px solid var(--line); border-radius: 1rem; background: var(--surface); box-shadow: 0 8px 24px rgb(23 44 37 / 0.06); }
@@ -119,7 +119,7 @@ button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
 .button-primary:active, .button-secondary:active { transform: translateY(1px); }
 .button-primary:disabled, .button-secondary:disabled { cursor: not-allowed; opacity: 0.55; }
 
-.ui-button { display: inline-flex; min-height: 3rem; align-items: center; justify-content: center; gap: 0.45rem; background: var(--surface); color: var(--forest-950); }
+.ui-button { display: inline-flex; min-height: 3rem; align-items: center; justify-content: center; gap: 0.45rem; background: var(--surface); color: var(--forest-950); cursor: pointer; }
 .ui-button-primary { background: var(--primary) !important; color: #fff !important; }
 .ui-button-selected { border-color: transparent !important; background: var(--opal-100) !important; color: var(--forest-950) !important; }
 .ui-button:disabled { cursor: not-allowed; }
