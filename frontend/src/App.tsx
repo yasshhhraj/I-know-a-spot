@@ -53,6 +53,15 @@ export default function App() {
         const { data, error } = await auth.signInWithPassword({ email: address, password: secret })
         return { session: data.session, error }
       },
+      signInWithGoogle: async () => {
+        // Return to the origin the user is currently using (localhost, a tunnel,
+        // or the deployed site). Each origin still must be allowlisted in Supabase.
+        const { error } = await auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.origin },
+        })
+        return { error }
+      },
       signOutLocal: async () => {
         const { error } = await auth.signOut({ scope: 'local' })
         return { error }
@@ -78,19 +87,22 @@ export default function App() {
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col justify-center px-5 py-10 text-stone-900">
       <p className="text-sm font-bold uppercase tracking-widest text-emerald-800">I Know a Spot</p>
       <h1 className="mt-3 text-3xl font-bold tracking-tight">Pilot access</h1>
-      <p className="mt-3 leading-relaxed text-stone-700">Sign in with a pre-created pilot account. Public spots will be visible to other enrolled members, not anonymous visitors.</p>
+       <p className="mt-3 leading-relaxed text-stone-700">Continue with Google or use an existing email/password account. Public spots are visible to authenticated members, not anonymous visitors.</p>
       <section className="mt-7 rounded-2xl border border-stone-300 bg-white p-5 shadow-sm" aria-live="polite">
         {configurationError && <><h2 className="text-xl font-semibold">Configuration needed</h2><p className="mt-2">The public Supabase or API settings are missing. Ask the pilot operator to configure this app.</p></>}
         {!configurationError && (view.kind === 'restoring' || view.kind === 'verifying') && <><h2 className="text-xl font-semibold">{view.kind === 'restoring' ? 'Restoring session…' : 'Verifying pilot access…'}</h2><p className="mt-2 text-stone-700">Please wait.</p></>}
         {!configurationError && signingForm && <>
           <h2 className="text-xl font-semibold">{view.kind === 'expired' ? 'Session expired' : 'Sign in'}</h2>
           {view.kind === 'expired' && <p className="mt-2">Your session could not be verified. Sign in again to continue.</p>}
-          {view.kind === 'signedOut' && view.credentialError && <p role="alert" className="mt-2 text-red-800">Those credentials were not accepted. Check your email and password and try again.</p>}
+           {view.kind === 'signedOut' && view.credentialError && <p role="alert" className="mt-2 text-red-800">Those credentials were not accepted. Check your email and password and try again.</p>}
+           {view.kind === 'signedOut' && view.oauthError && <p role="alert" className="mt-2 text-red-800">Google sign-in could not be started. Check your connection and try again.</p>}
           <form className="mt-4 space-y-4" onSubmit={submit}>
             <div><label className="block font-medium" htmlFor="email">Email</label><input id="email" name="email" type="email" autoComplete="username" required value={email} onChange={e => setEmail(e.target.value)} className="mt-1 w-full rounded-lg border border-stone-500 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" /></div>
             <div><label className="block font-medium" htmlFor="password">Password</label><input id="password" name="password" type="password" autoComplete="current-password" required value={password} onChange={e => setPassword(e.target.value)} className="mt-1 w-full rounded-lg border border-stone-500 px-3 py-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700" /></div>
             <button disabled={view.kind === 'signingIn' || !controller} className="min-h-12 w-full rounded-lg bg-emerald-800 px-4 py-3 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-60">{view.kind === 'signingIn' ? 'Signing in…' : 'Sign in'}</button>
           </form>
+          <div className="my-4 flex items-center gap-3 text-sm text-stone-500"><span className="h-px flex-1 bg-stone-300" />or<span className="h-px flex-1 bg-stone-300" /></div>
+          <button type="button" disabled={view.kind === 'signingIn' || !controller} onClick={() => void controller?.signInWithGoogle()} className="min-h-12 w-full rounded-lg border border-stone-600 px-4 py-3 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-60">{view.kind === 'signingIn' ? 'Starting Google sign-in…' : 'Continue with Google'}</button>
         </>}
         {!configurationError && view.kind === 'enrolled' && <>
           <h2 className="text-xl font-semibold">Welcome, {view.profile.displayName}</h2>

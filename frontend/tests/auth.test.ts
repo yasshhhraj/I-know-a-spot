@@ -91,6 +91,7 @@ function harness(initial: AuthSession | null = session(user)) {
     getSession: () => restore.promise,
     onChange: cb => { callback = cb; return () => { unsubscribed = true } },
     signIn: async () => ({ session: initial, error: null }),
+    signInWithGoogle: async () => ({ error: null }),
     signOutLocal: () => signout.promise,
   }
   const controller = new AuthController(port, (token, id, signal) => {
@@ -334,6 +335,7 @@ test('invalid credentials are distinct from outages and passwords do not enter v
     getSession: async () => ({ session: null, error: null }),
     onChange: cb => { callback = cb; return () => {} },
     signIn: async () => ({ session: null, error }),
+    signInWithGoogle: async () => ({ error: null }),
     signOutLocal: async () => ({ error: null }),
   }, async () => ({ kind: 'outage' }), view => seen.push(view))
   gate.start()
@@ -345,6 +347,22 @@ test('invalid credentials are distinct from outages and passwords do not enter v
   error = { code: 'network_error' }
   await gate.signIn('pilot@example.test', 'not-a-real-password')
   assert.equal(seen.at(-1)?.kind, 'outage')
+  gate.dispose()
+})
+
+test('Google OAuth initiation delegates to the auth port and reports initiation failure', async () => {
+  let starts = 0
+  const seen: AuthView[] = []
+  const gate = new AuthController({
+    getSession: async () => ({ session: null, error: null }), onChange: () => () => {},
+    signIn: async () => ({ session: null, error: null }), signOutLocal: async () => ({ error: null }),
+    signInWithGoogle: async () => { starts++; return { error: new Error('provider unavailable') } },
+  }, async () => ({ kind: 'outage' }), view => seen.push(view))
+  gate.start()
+  await tick()
+  await gate.signInWithGoogle()
+  assert.equal(starts, 1)
+  assert.deepEqual(seen.at(-1), { kind: 'signedOut', oauthError: true })
   gate.dispose()
 })
 

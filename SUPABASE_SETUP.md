@@ -7,7 +7,7 @@ created accounts, inspected private env files, or tested live sign-in/RLS.
 No PostgreSQL URI or service-role key is required for application `/me` access.
 Use the new publishable key (`sb_publishable_...`) in the appropriate local env files.
 
-## 1. Apply the schema migration once
+## 1. Apply the schema migrations once
 
 In **your Supabase project → SQL Editor**, inspect and run the full contents of:
 
@@ -19,45 +19,71 @@ Run as the project operator, not a browser/pilot account. The migration creates:
 - RLS and narrow privileges: own-profile reads, own enrolled radius-only updates,
   own enrolled connection reads; no client enrollment or connection creation.
 
+After the first migration exists remotely, run:
+
+`backend/supabase/migrations/202610080006_auth_pilot_member_trigger.sql`
+
+Run this as the project operator. It installs an `auth.users` insert trigger that
+creates one enrolled `pilot_members` row for each newly created Auth user. The row
+uses the provider name when available and keeps email in Supabase Auth rather than
+duplicating it in the application table. Existing Auth users are not backfilled by
+this trigger; enroll any existing test users deliberately or create a new test user.
+
 It contains `CREATE TABLE` statements, so do not repeatedly run it or delete an
 existing table to resolve a conflict. If those tables already exist, stop and
 compare schema/migration history before proceeding. SQL files being present in
 the repository does not mean the schema or policies exist remotely.
 
-## 2. Create pilot sign-in accounts
+## 2. Configure Google and keep the existing password login
 
-In **Authentication → Users**, use the dashboard's user-creation action to create
-the accounts yourself. Choose email/password accounts and ensure their email is
-confirmed for the pilot sign-in flow. Use consented test accounts first.
+In **Authentication → Providers → Google**, enable Google and paste the Google
+OAuth client ID and client secret from Google Cloud. These credentials belong in
+the Supabase dashboard, not in repository files or `VITE_` environment variables.
+
+In Google Cloud, add this authorized redirect URI exactly:
+
+`https://YOUR_PROJECT_REF.supabase.co/auth/v1/callback`
+
+In **Authentication → URL Configuration**, set the canonical Site URL and add every
+development/deployment origin that will be used as an Additional Redirect URL, for
+example:
+
+`http://localhost:5173`
+
+`https://YOUR_FRONTEND_NGROK_DOMAIN`
+
+The frontend requests the current browser origin as its OAuth return URL, so the
+origin must be allowlisted before using it. It keeps the existing email/password
+form as a second path.
 
 In Auth settings:
 - Enable email/password sign-in.
-- Disable new public signups for this pre-enrolled pilot. Hiding a signup button
-  in our UI is not enough to disable the provider's signup endpoint.
-- Configure the local site URL as `http://localhost:5173` where applicable.
-  This slice has no OAuth/magic-link/password-reset callback flow.
+- Enable Google sign-in.
+- Do not enable providers or password signup flows that are not part of this scope.
 
-The app has no signup button or account-creation endpoint. Keep passwords and real
-account identifiers out of source, screenshots, chat, and shared documentation.
+Google creates the Supabase Auth user and the trigger creates the corresponding
+enrolled application row. Keep passwords, OAuth secrets and real account identifiers
+out of source, screenshots, chat and shared documentation.
 
-## 3. Enroll a chosen account explicitly
+## 3. Handle existing accounts and verify first login
 
-Copy the account's Auth user UUID from the dashboard. In your project's SQL Editor,
-replace the placeholder privately and run:
+Existing email/password accounts that already have `pilot_members` rows are unchanged.
+If an existing Auth user has no application row, create one deliberately in the
+project SQL Editor:
 
 ```sql
 insert into public.pilot_members (user_id, display_name, enrolled)
 values ('REPLACE_WITH_AUTH_USER_UUID'::uuid, 'Pilot member', true);
 ```
 
-Do not enroll every Auth user automatically or derive enrollment from user-editable
-metadata. An authenticated account without a row (or with enrolled=false) is denied.
-For an existing row, the operator may deliberately update its enrollment rather
-than duplicate it. Members cannot change enrollment or their fixed display name.
+The trigger does not modify existing rows, and it never exposes an insert/update path
+to browser clients. An authenticated account without a row (or with enrolled=false)
+is still denied. Members cannot change enrollment or their fixed display name.
 
-To test denial, create another disposable confirmed Auth account and **do not
-enroll it**. It should sign in with Supabase but receive `/me` 403 and the app's
-“Not enrolled” state. Correct authentication is not automatic pilot membership.
+To test the new path, use a disposable Google account that has not previously been
+created in the project. Complete Google sign-in once, then confirm exactly one
+`pilot_members` row exists and `/me` returns the user's own profile. Repeating login
+must not create a duplicate row.
 
 ## 4. Configure consented connections when ready
 
@@ -107,17 +133,21 @@ Restart dev servers in separate terminals (from each app directory):
 npm run dev
 ```
 
-Open **http://localhost:5173**. Sign in with the enrolled account. Expect:
-“Welcome, Pilot member,” verified membership, and a read-only saved radius.
+Open **http://localhost:5173**. Choose **Continue with Google** or use an existing
+email/password account. Expect “Welcome, <name>,” verified membership, and a
+read-only saved radius.
 The auth-only slice originally stopped here. The sharing workspace now also loads
 for enrolled accounts, but its separate spots/Storage migration and backend admin
 configuration are required; follow SPOT_SHARING_SETUP.md before testing it.
 
 ## 6. Live acceptance checklist
 
-- Enrolled account: sign-in succeeds, `/me` is 200 with only that user's profile.
+- New Google account: OAuth returns to the app, the trigger creates one member row,
+  sign-in succeeds, and `/me` is 200 with only that user's profile.
+- Existing password account: the current email/password login still works.
 - Reload: session restores, but UI verifies `/me` before showing profile.
-- Unenrolled account: sign-in succeeds at provider, `/me` 403, no profile exposed.
+- Existing unenrolled account: sign-in succeeds at the provider, `/me` 403, and no
+  profile is exposed.
 - Signed-out request: `/me` 401; sign-out immediately hides prior profile.
 - Switch accounts: late requests cannot restore the previous account's profile.
 - Stop backend: retryable outage shown, not incorrect-password/enrollment denial;

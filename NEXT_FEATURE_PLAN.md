@@ -5,6 +5,86 @@ Contract: `API_CONTRACT.md`. Migration/live steps: `PUBLIC_DISCOVERY_SETUP.md`.
 Backend 86 tests / frontend 32 tests passed; remote SQL and live Public/radius
 checks remain pending. No claim that the full pilot is complete.
 
+## Tomorrow's plan — October 9, 2026
+
+Current end-of-day state: Google OAuth is working through the Supabase provider
+with the existing email/password field retained. The user confirmed the ngrok
+redirect fix works. The first-login provisioning migration and OAuth setup still
+need their final live/database verification if that has not already been done.
+
+### 1. Add explicit current-location support to Add a spot
+
+Acceptance criteria:
+
+- In the Add a spot map/pin view, add a labelled **Use current location** button.
+- On a user click only, call the browser Geolocation API and fill the existing
+  latitude/longitude fields or staged pin with the returned coordinates.
+- Do not request location permission on page load, sign-in, feed browsing, or form
+  mount. Do not start background tracking or add a native location plugin.
+- Show a pending state, permission-denied state, unavailable/timeout state and a
+  manual-coordinate/map-pin fallback. The user can still edit or replace the pin.
+- Keep the current explicit destination confirmation and creation validation. Do not
+  auto-submit after coordinates arrive, and do not persist precise device location.
+- Verify the browser sends only the chosen spot coordinates through the existing
+  create flow; coordinates/photos/member IDs must not reach semantic search.
+- Test allow, deny, timeout/unavailable, cancel/manual fallback, camera return and
+  stale account/session cases. The feature is user-initiated convenience, not an
+  authorization or location-tracking feature.
+
+Likely ownership: `frontend/src/SpotWorkspace.tsx`, existing coordinate/map helpers,
+and a focused location controller/helper plus tests. Preserve the current map
+library and API contract unless implementation evidence requires a contract change.
+
+### 2. Revamp the frontend UI
+
+Resume from:
+
+- `FRONTEND_REDESIGN_PLAN.md`
+- `FRONTEND_DESIGN_RESEARCH.md`
+- `SPOTMARK_CONCEPT.svg`
+
+Before implementation, confirm Forest & Opal versus an alternative palette and
+whether to retain the existing Tailwind/native component strategy or add MUI. Keep
+the current API, authentication, audience/radius rules, protected media, reporting,
+explored state and camera-return behavior unchanged. Implement in phases: foundation
+tokens/brand, access/discover shell, focused Add/detail/Profile surfaces, then
+phone/accessibility review. Run the real frontend checks after each meaningful slice.
+
+### 3. Deploy
+
+- Confirm the deployment target, frontend origin, backend origin and HTTPS callback
+  URLs before changing any production configuration.
+- Build the static frontend and backend using the repository's real commands.
+- Configure the deployed frontend origin in Supabase URL Configuration and Google
+  OAuth redirect settings; keep secrets server-side and out of `VITE_` variables.
+- Verify Google OAuth, existing email/password login, `/me`, account switching,
+  Public/Connections authorization, protected photos and the create/detail flow on
+  the deployed origin. Deployment is not complete from a local build alone.
+
+### 4. Record a demo
+
+Record a short product walkthrough after deployment: landing/sign-in, Google OAuth,
+Discover feed/map, current-location Add flow, audience choice, detail/directions,
+explored state and reporting. Use consented/disposable data only; do not show tokens,
+private coordinates, private member notes, dashboard secrets or browser profiles.
+Confirm the recording format/destination at the start of the next session.
+
+### 5. Write the DEV blog
+
+Draft a reviewable DEV post after the recorded demo, covering the problem, mobile-first
+redesign, Supabase Google OAuth decision, user-initiated geolocation, authorization
+boundaries, deployment lessons and verification gaps. Include the actual checks and
+do not claim unverified RLS/Storage/security results. Stage the draft first; publish
+only after reviewing screenshots, links, AI disclosure and any private data. Use the
+DevRelay publishing flow only when explicitly ready to create the draft/publish.
+
+### Tomorrow's first action
+
+Read this section and `WORKBOARD.md`, inspect `git status`, then implement the
+user-initiated **Use current location** button before starting the visual redesign.
+Do not install packages, deploy, record, or publish until the relevant step is
+explicitly reached and configured.
+
 ## Why this is next
 
 The current live slice proves authenticated sharing, a Connections preview, detail,

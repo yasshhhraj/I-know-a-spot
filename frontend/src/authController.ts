@@ -2,13 +2,14 @@ import type { MeResult, Profile } from './api.ts'
 
 export type AuthSession = { access_token: string; user: { id: string } }
 export type AuthView =
-  | { kind: 'restoring' | 'verifying' | 'signingIn' | 'signingOut' | 'signedOut' | 'expired' | 'denied' | 'outage' | 'logoutFailed'; credentialError?: boolean }
+  | { kind: 'restoring' | 'verifying' | 'signingIn' | 'signingOut' | 'signedOut' | 'expired' | 'denied' | 'outage' | 'logoutFailed'; credentialError?: boolean; oauthError?: boolean }
   | { kind: 'enrolled'; profile: Profile }
 
 export type AuthPort = {
   getSession(): Promise<{ session: AuthSession | null; error: unknown }>
   onChange(callback: (event: string, session: AuthSession | null) => void): () => void
   signIn(email: string, password: string): Promise<{ session: AuthSession | null; error: unknown }>
+  signInWithGoogle(): Promise<{ error: unknown }>
   signOutLocal(): Promise<{ error: unknown }>
 }
 
@@ -119,6 +120,22 @@ export class AuthController {
       else this.accept(session)
     } catch {
       if (this.active && rev === this.revision) this.update({ kind: 'outage' })
+    }
+  }
+
+  async signInWithGoogle() {
+    if (!this.active || (this.view.kind !== 'signedOut' && this.view.kind !== 'expired')) return
+    const rev = this.invalidate()
+    this.session = null
+    this.update({ kind: 'signingIn' })
+    try {
+      const { error } = await this.auth.signInWithGoogle()
+      if (!this.active || rev !== this.revision) return
+      // A successful OAuth initiation redirects the browser; session restoration and
+      // onAuthStateChange verify the returned session after that redirect.
+      if (error) this.update({ kind: 'signedOut', oauthError: true })
+    } catch {
+      if (this.active && rev === this.revision) this.update({ kind: 'signedOut', oauthError: true })
     }
   }
 

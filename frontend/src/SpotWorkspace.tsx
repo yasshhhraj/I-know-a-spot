@@ -9,6 +9,7 @@ import { searchQuery, searchSpots, SearchApiError, type SearchResult } from './s
 import { ScopedResultsController } from './searchController'
 import { ExploredControl } from './ExploredControl'
 import { ReportControl } from './ReportControl'
+import { SpotLocationController, type SpotLocationState } from './spotLocation'
 
 type Props = { profile: Profile; recheck: () => void }
 const button = 'min-h-12 rounded-lg border border-stone-600 px-4 py-2 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700 disabled:opacity-50'
@@ -56,6 +57,13 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
   const [uncertain, setUncertain] = useState(false)
   const [reconciliationStatus, setReconciliationStatus] = useState('')
   const [ownCandidates, setOwnCandidates] = useState<Spot[]>([])
+  const [locationState, setLocationState] = useState<SpotLocationState>({ kind: 'idle' })
+  const location = useRef<SpotLocationController | null>(null)
+  if (!location.current) location.current = new SpotLocationController(() => navigator.geolocation, state => {
+    setLocationState(state)
+    if (state.kind === 'success') setFields(current => ({ ...current, latitude: state.latitude, longitude: state.longitude }))
+  })
+  useEffect(() => () => location.current?.dispose(), [])
   const reconciliation = useRef<SpotScope | null>(null)
   useEffect(() => () => { reconciliation.current?.dispose(); reconciliation.current = null }, [])
   useEffect(() => {
@@ -64,7 +72,10 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
     setPreview(url)
     return () => scope.revoke(url)
   }, [file, scope])
-  const change = (name: keyof FormState, value: string | boolean) => setFields(current => ({ ...current, [name]: value }))
+  const change = (name: keyof FormState, value: string | boolean) => {
+    if (name === 'latitude' || name === 'longitude') location.current?.cancel()
+    setFields(current => ({ ...current, [name]: value }))
+  }
   const pin = Number(fields.latitude) >= -90 && Number(fields.latitude) <= 90 && Number(fields.longitude) >= -180 && Number(fields.longitude) <= 180 && fields.latitude.trim() !== '' && fields.longitude.trim() !== '' ? [Number(fields.latitude), Number(fields.longitude)] as [number, number] : null
 
   function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
@@ -135,7 +146,10 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
       <label className="block"><input type="radio" checked={fields.audience === 'public'} onChange={() => change('audience', 'public')} /> Public</label>
       {fields.audience === 'public' && <p className="rounded-lg bg-amber-50 p-3 text-amber-950">Unfamiliar enrolled pilot members can discover this spot in Public and see your display name, photo, note and exact destination pin.</p>}
     </fieldset>
-    <div><p className="font-medium">Destination pin (required)</p><p className="mb-2 text-sm">Map overview is not your current location. Tap/click the map to select a pin, or enter coordinates below. Map tiles load from an external provider; no location permission is requested.</p><SpotMap pin={pin} worldPicker onPick={(lat, lng) => setFields(current => ({ ...current, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }))} /></div>
+    <div><p className="font-medium">Destination pin (required)</p><p className="mb-2 text-sm">Map overview is not your current location. Tap/click the map to select a pin, enter coordinates below, or choose Use current location. Map tiles load from an external provider; location permission is requested only when you choose the button.</p>
+      {!original && <><button type="button" className={`${button} mb-2`} disabled={locationState.kind === 'pending' || pending} onClick={() => location.current?.request()} aria-describedby="spot-location-status">{locationState.kind === 'pending' ? 'Finding location…' : 'Use current location'}</button>
+        <p id="spot-location-status" role="status" className="mb-2 text-sm">{locationState.kind === 'pending' ? 'Waiting for your browser location. You can still select the map or enter coordinates manually.' : locationState.kind === 'success' ? 'Location filled in. Check the destination pin and edit coordinates if needed; nothing has been shared yet.' : locationState.kind === 'permissionDenied' ? 'Location permission denied. Change browser permissions to retry, or select the map or enter coordinates manually.' : locationState.kind === 'unsupported' ? 'This browser does not support location. Select the map or enter coordinates manually.' : locationState.kind === 'unavailable' ? 'Location unavailable or timed out. Retry with the button or select the map or enter coordinates manually.' : 'Optional: use your location for this destination pin, or select the map or enter coordinates manually.'}</p></>}
+      <SpotMap pin={pin} worldPicker onPick={(lat, lng) => { location.current?.cancel(); setFields(current => ({ ...current, latitude: lat.toFixed(6), longitude: lng.toFixed(6) })) }} /></div>
     <div className="grid gap-3 sm:grid-cols-2"><label>Latitude (-90 to 90)<input className={input} type="number" min={-90} max={90} step="any" inputMode="decimal" value={fields.latitude} onChange={e => change('latitude', e.target.value)} /></label><label>Longitude (-180 to 180)<input className={input} type="number" min={-180} max={180} step="any" inputMode="decimal" value={fields.longitude} onChange={e => change('longitude', e.target.value)} /></label></div>
     <p aria-live="polite">{pin ? `Selected destination: ${pin[0]}, ${pin[1]}` : 'No destination pin selected.'}</p>
     <label className="block">Known access restrictions (optional, max 200)<textarea className={input} maxLength={200} value={fields.accessNote} onChange={e => change('accessNote', e.target.value)} /></label>

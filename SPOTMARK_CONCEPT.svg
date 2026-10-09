@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 360" role="img" aria-labelledby="title desc">
+  <title id="title">Spotmark — I Know a Spot logo concept</title>
+  <desc id="desc">Original planning study: a forest-green destination pin with a mint leaf, a wordmark, and compact monochrome variants. Not a production logo or a real map.</desc>
+  <defs>
+    <symbol id="mark" viewBox="0 0 128 128">
+      <path d="M64 10C40 10 23 28 23 51c0 28 41 66 41 66s41-38 41-66c0-23-17-41-41-41Z" fill="currentColor"/>
+      <path d="M43 66c-2-24 13-37 41-36 0 26-13 42-34 39Z" fill="#DCEFE5"/>
+      <path d="M44 79c6-18 16-32 29-40" fill="none" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+    </symbol>
+  </defs>
+  <rect width="800" height="360" rx="24" fill="#F7F8F4"/>
+  <text x="40" y="42" fill="#52645B" font-family="system-ui,sans-serif" font-size="14">BRAND STUDY · PROPOSED, NOT INSTALLED</text>
+  <use href="#mark" x="36" y="64" width="116" height="116" color="#1F6B50"/>
+  <text x="172" y="119" fill="#172C25" font-family="system-ui,sans-serif" font-size="40" font-weight="650">I Know a Spot</text>
+  <text x="174" y="150" fill="#52645B" font-family="system-ui,sans-serif" font-size="18">Small discoveries. A reason to go outside.</text>
+  <path d="M40 208H760" stroke="#D7DED6"/>
+  <rect x="42" y="234" width="80" height="80" rx="20" fill="#DCEFE5"/>
+  <use href="#mark" x="50" y="242" width="64" height="64" color="#1F6B50"/>
+  <text x="144" y="263" fill="#172C25" font-family="system-ui,sans-serif" font-size="16" font-weight="600">App mark</text>
+  <text x="144" y="288" fill="#52645B" font-family="system-ui,sans-serif" font-size="14">Forest + mint</text>
+  <use href="#mark" x="372" y="246" width="48" height="48" color="#172C25"/>
+  <text x="442" y="263" fill="#172C25" font-family="system-ui,sans-serif" font-size="16" font-weight="600">Single-ink direction</text>
+  <text x="442" y="288" fill="#52645B" font-family="system-ui,sans-serif" font-size="14">Leaf inset to be simplified for final export</text>
+  <use href="#mark" x="716" y="253" width="24" height="24" color="#1F6B50"/>
+  <text x="708" y="300" fill="#52645B" font-family="system-ui,sans-serif" font-size="14">24px</text>
+</svg>
