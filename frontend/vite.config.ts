@@ -3,6 +3,9 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 export default defineConfig({
+  // GitHub Pages serves this repository under /I-know-a-spot/. Local and
+  // custom-domain builds remain rooted at /.
+  base: (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.GITHUB_ACTIONS ? '/I-know-a-spot/' : '/',
   plugins: [react(), tailwindcss()],
   build: {
     rollupOptions: {

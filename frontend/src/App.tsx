@@ -57,9 +57,10 @@ export default function App() {
       signInWithGoogle: async () => {
         // Return to the origin the user is currently using (localhost, a tunnel,
         // or the deployed site). Each origin still must be allowlisted in Supabase.
+        const redirectTo = `${window.location.origin}${window.location.pathname}`
         const { error } = await auth.signInWithOAuth({
           provider: 'google',
-          options: { redirectTo: window.location.origin },
+          options: { redirectTo },
         })
         return { error }
       },
