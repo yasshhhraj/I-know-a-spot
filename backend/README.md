@@ -74,6 +74,28 @@ stop it with Ctrl-C. Tests inject HTTP requests without opening a listening
 socket, including mock-transport Supabase Auth/PostgREST boundary checks. These
 do not prove live remote configuration, applied policies, or live RLS behavior.
 
+## Docker / ECS Fargate image
+
+The `Dockerfile` builds an `linux/amd64`-compatible runtime image for ECS
+Fargate. It typechecks/builds the backend, downloads and verifies the pinned
+MiniLM artifacts during the image build, runs the cache-only model smoke check,
+and copies only compiled output, production dependencies and verified model
+artifacts into the runtime stage. Secrets are not copied into the image.
+
+From `backend/`:
+
+```sh
+docker build --platform linux/amd64 -t i-know-a-spot-backend:local .
+docker run --rm --env-file .env -p 3001:3001 i-know-a-spot-backend:local
+```
+
+For ECR, replace the local tag with the full private-repository image URI and
+push a unique release tag rather than relying only on `latest`. The runtime
+expects `HOST=0.0.0.0`, `PORT=3001`, the exact deployed `FRONTEND_ORIGIN`, and
+the Supabase/model variables from the task definition or its secret references.
+The image includes a container healthcheck for `/health`; that endpoint is still
+only a liveness/scaffold response, not a claim of integration readiness.
+
 ## Safe API response logging
 
 The backend emits one JSON log line after every request completes, including

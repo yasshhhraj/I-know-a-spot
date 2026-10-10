@@ -86,6 +86,15 @@ button, [role="button"], a { -webkit-tap-highlight-color: transparent; }
 .card { border-radius: 1.1rem; box-shadow: var(--shadow-card); }
 .workspace-shell { margin-top: 1.5rem; padding-bottom: 7.5rem; }
 .workspace-heading { display: flex; align-items: flex-end; justify-content: space-between; gap: 1rem; }
+.icon-button { display: inline-flex; min-width: 3rem; align-items: center; justify-content: center; padding-inline: .75rem; }
+.topbar-icon-button { display: inline-flex; flex: 0 0 3rem; width: 3rem; min-width: 3rem; height: 3rem; min-height: 3rem; align-items: center; justify-content: center; border: 0; border-radius: 0.75rem; padding: 0; background: transparent; color: var(--ink-muted); cursor: pointer; }
+.topbar-icon-button:hover { color: var(--forest-900); }
+.topbar-icon-button--active { color: var(--forest-950); }
+.topbar-icon-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.map-location-button { position: absolute; z-index: 1000; top: 0.625rem; right: 0.625rem; display: inline-flex; width: 3rem; height: 3rem; align-items: center; justify-content: center; border: 1px solid rgb(23 44 37 / 0.2); border-radius: 0.75rem; background: var(--surface); color: var(--forest-950); box-shadow: 0 2px 8px rgb(23 44 37 / 0.2); cursor: pointer; }
+.map-location-button:hover { background: var(--surface-muted); }
+.map-location-button:disabled { cursor: wait; opacity: 0.6; }
+.map-location-button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .workspace-kicker { color: var(--primary); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
 .workspace-nav { position: fixed; z-index: 1000; bottom: max(0.75rem, env(safe-area-inset-bottom)); left: 50%; display: grid; width: min(calc(100% - 2rem), 34rem); grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.5rem; padding: 0.4rem; border: 1px solid var(--line); border-radius: 1.1rem; background: rgb(255 255 255 / 0.94); box-shadow: 0 14px 34px rgb(23 44 37 / 0.16); backdrop-filter: blur(16px); transform: translateX(-50%); }
 .nav-item { display: inline-flex; min-height: 3rem; align-items: center; justify-content: center; gap: 0.4rem; border: 0; border-radius: 0.75rem; background: transparent; color: var(--ink-muted); cursor: pointer; font-weight: 700; }

@@ -4,6 +4,8 @@ import { getSupabaseClient } from './supabase'
 import { fetchMe } from './api'
 import { AuthController, type AuthView } from './authController'
 import { BrandMark } from './BrandMark'
+import { SignOutIcon } from './Icons'
+import { GlobeIcon, UsersIcon } from './Icons'
 
 const SpotWorkspace = lazy(() => import('./SpotWorkspace').then(module => ({ default: module.SpotWorkspace })))
 
@@ -28,6 +30,7 @@ export default function App() {
   const [configurationError, setConfigurationError] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [feed, setFeed] = useState<'connections' | 'public'>('connections')
   const recheck = useCallback(() => controller?.recheckAccess(), [controller])
 
   useEffect(() => {
@@ -87,14 +90,19 @@ export default function App() {
   const signingForm = view.kind === 'signedOut' || view.kind === 'expired' || view.kind === 'signingIn'
   const enrolledProfile = view.kind === 'enrolled' ? view.profile : null
   const enrolled = enrolledProfile !== null
+  const changeFeed = (next: 'connections' | 'public') => setFeed(next)
   return (
     <main className="app-canvas min-h-screen">
       <div className={enrolled ? 'mx-auto w-full max-w-6xl px-4 pb-8 pt-4 sm:px-6 lg:px-8' : 'mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center gap-8 px-4 py-8 sm:px-6 lg:flex-row lg:items-center lg:gap-16 lg:px-8'}>
         <header className={enrolled ? 'flex items-center justify-between gap-4 border-b border-[var(--line)] pb-4' : 'max-w-xl'}>
           <BrandMark />
           {enrolled && <div className="flex items-center gap-3">
+            <div role="group" aria-label="Discovery feed" className="flex items-center gap-1">
+              <button type="button" aria-pressed={feed === 'connections'} aria-label="Connections feed" title="Connections feed" className={`topbar-icon-button ${feed === 'connections' ? 'topbar-icon-button--active' : ''}`} onClick={() => changeFeed('connections')}><UsersIcon className="h-5 w-5" /></button>
+              <button type="button" aria-pressed={feed === 'public'} aria-label="Public feed" title="Public feed" className={`topbar-icon-button ${feed === 'public' ? 'topbar-icon-button--active' : ''}`} onClick={() => changeFeed('public')}><GlobeIcon className="h-5 w-5" /></button>
+            </div>
             <span className="hidden text-sm text-[var(--ink-muted)] sm:inline">{enrolledProfile.displayName}</span>
-            <button type="button" onClick={() => void controller?.signOut()} className="button-secondary">Sign out</button>
+            <button type="button" onClick={() => void controller?.signOut()} className="topbar-icon-button" aria-label="Sign out" title="Sign out"><SignOutIcon className="h-5 w-5" /></button>
           </div>}
         </header>
         {!enrolled && <section className="max-w-xl">
@@ -105,7 +113,7 @@ export default function App() {
         </section>}
         {enrolledProfile ? <WorkspaceBoundary>
           <Suspense fallback={<p role="status" className="mt-8">Loading your spots…</p>}>
-            <SpotWorkspace profile={enrolledProfile} recheck={recheck} />
+            <SpotWorkspace profile={enrolledProfile} recheck={recheck} feed={feed} onFeedChange={changeFeed} />
           </Suspense>
         </WorkspaceBoundary> : <section className="surface card w-full max-w-xl p-5 sm:p-7" aria-live="polite">
           {configurationError && <><h2 className="text-2xl font-semibold text-[var(--forest-950)]">Configuration needed</h2><p className="mt-2 text-[var(--ink-muted)]">The public Supabase or API settings are missing. Ask the pilot operator to configure this app.</p></>}

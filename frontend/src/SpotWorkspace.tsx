@@ -10,9 +10,9 @@ import { ScopedResultsController } from './searchController'
 import { ExploredControl } from './ExploredControl'
 import { ReportControl } from './ReportControl'
 import { SpotLocationController, type SpotLocationState } from './spotLocation'
-import { ArrowLeftIcon, CameraIcon, CheckIcon, DirectionsIcon, ExploreIcon, GlobeIcon, LocateIcon, MapPinIcon, PhotoIcon, PlusIcon, RefreshIcon, SearchIcon, UsersIcon, XIcon, PersonIcon } from './Icons'
+import { CameraIcon, CheckIcon, DirectionsIcon, ExploreIcon, GlobeIcon, LocateIcon, MapPinIcon, PhotoIcon, PlusIcon, RefreshIcon, SearchIcon, UsersIcon, XIcon, PersonIcon } from './Icons'
 
-type Props = { profile: Profile; recheck: () => void }
+type Props = { profile: Profile; recheck: () => void; feed: Audience; onFeedChange: (feed: Audience) => void }
 const button = 'ui-button min-h-12 rounded-xl border border-[var(--control-outline)] px-4 py-2 font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)] disabled:opacity-50'
 const input = 'mt-1 w-full rounded-xl border border-[var(--control-outline)] bg-[var(--surface)] px-3 py-3 text-[var(--ink)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--focus)]'
 const empty = () => ({ title: '', note: '', audience: 'connections' as Audience, accessNote: '', accessConfirmed: false, latitude: '', longitude: '' })
@@ -133,11 +133,11 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
   return <form onSubmit={e => void save(e)} className="surface card mt-6 space-y-5 p-4 sm:p-6" aria-label={original ? 'Edit spot' : 'Add a spot'}>
     <div><p className="workspace-kicker">{original ? 'Refine the story' : 'Share a discovery'}</p><h3 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[var(--forest-950)]">{original ? 'Edit spot metadata' : 'Add a spot'}</h3></div>
     {!original && <>
-      <p className="text-sm leading-6 text-[var(--ink-muted)]">One photo, up to 10 MiB: JPEG, PNG or WebP. HEIC and animated images are unsupported. The server checks actual bytes and removes metadata.</p>
-      <div className="flex flex-wrap gap-3">
-        <label className={button}><CameraIcon className="h-5 w-5" />Take photo<input className="block max-w-48 text-sm" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={selectPhoto} disabled={pending} aria-label="Take photo with camera where supported" /></label>
-        <label className={button}><PhotoIcon className="h-5 w-5" />Choose photo<input className="block max-w-48 text-sm" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectPhoto} disabled={pending} aria-label="Choose a photo from device" /></label>
-      </div>
+      <p className="text-sm leading-6 text-[var(--ink-muted)]">One photo, up to 10 MiB: JPEG, PNG or WebP. HEIC and animated images are unsupported. </p>
+       <div className="flex items-center gap-3">
+         <label className={`${button} w-12 px-0`} title="Take photo" aria-label="Take photo with camera where supported"><CameraIcon className="h-5 w-5" /><input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={selectPhoto} disabled={pending} aria-label="Take photo with camera where supported" /></label>
+         <label className={`${button} w-12 px-0`} title="Choose photo" aria-label="Choose a photo from device"><PhotoIcon className="h-5 w-5" /><input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectPhoto} disabled={pending} aria-label="Choose a photo from device" /></label>
+       </div>
        {preview && <img src={preview} alt="Selected photo preview" className="max-h-72 w-full rounded-xl bg-[var(--surface-muted)] object-contain" />}
     </>}
     <label className="block font-medium">Title (1–80)<input className={input} value={fields.title} maxLength={80} required onChange={e => change('title', e.target.value)} /></label>
@@ -148,9 +148,7 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
       {fields.audience === 'public' && <p className="mt-3 rounded-xl bg-[var(--warning-surface)] p-3 text-sm leading-6 text-[var(--warning-text)]">Unfamiliar enrolled pilot members can discover this spot in Public and see your display name, photo, note and exact destination pin.</p>}
     </fieldset>
     <div><p className="font-semibold">Destination pin (required)</p><p className="mb-2 text-sm leading-6 text-[var(--ink-muted)]">Map overview is not your current location. Tap/click the map to select a pin, enter coordinates below, or choose Use current location. Map tiles load from an external provider; location permission is requested only when you choose the button.</p>
-      {!original && <><button type="button" className={`${button} mb-2`} disabled={locationState.kind === 'pending' || pending} onClick={() => location.current?.request()} aria-describedby="spot-location-status">{locationState.kind === 'pending' ? 'Finding location…' : 'Use current location'}</button>
-        <p id="spot-location-status" role="status" className="mb-2 text-sm">{locationState.kind === 'pending' ? 'Waiting for your browser location. You can still select the map or enter coordinates manually.' : locationState.kind === 'success' ? 'Location filled in. Check the destination pin and edit coordinates if needed; nothing has been shared yet.' : locationState.kind === 'permissionDenied' ? 'Location permission denied. Change browser permissions to retry, or select the map or enter coordinates manually.' : locationState.kind === 'unsupported' ? 'This browser does not support location. Select the map or enter coordinates manually.' : locationState.kind === 'unavailable' ? 'Location unavailable or timed out. Retry with the button or select the map or enter coordinates manually.' : 'Optional: use your location for this destination pin, or select the map or enter coordinates manually.'}</p></>}
-      <SpotMap pin={pin} worldPicker onPick={(lat, lng) => { location.current?.cancel(); setFields(current => ({ ...current, latitude: lat.toFixed(6), longitude: lng.toFixed(6) })) }} /></div>
+       <SpotMap pin={pin} worldPicker onCurrentLocation={(lat, lng) => { location.current?.cancel(); setFields(current => ({ ...current, latitude: lat.toFixed(6), longitude: lng.toFixed(6) })) }} onPick={(lat, lng) => { location.current?.cancel(); setFields(current => ({ ...current, latitude: lat.toFixed(6), longitude: lng.toFixed(6) })) }} /></div>
     <div className="grid gap-3 sm:grid-cols-2"><label>Latitude (-90 to 90)<input className={input} type="number" min={-90} max={90} step="any" inputMode="decimal" value={fields.latitude} onChange={e => change('latitude', e.target.value)} /></label><label>Longitude (-180 to 180)<input className={input} type="number" min={-180} max={180} step="any" inputMode="decimal" value={fields.longitude} onChange={e => change('longitude', e.target.value)} /></label></div>
     <p aria-live="polite">{pin ? `Selected destination: ${pin[0]}, ${pin[1]}` : 'No destination pin selected.'}</p>
     <label className="block">Known access restrictions (optional, max 200)<textarea className={input} maxLength={200} value={fields.accessNote} onChange={e => change('accessNote', e.target.value)} /></label>
@@ -164,8 +162,7 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
   </form>
 }
 
-function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }) {
-  const [feed, setFeed] = useState<Audience>('connections')
+function LiveWorkspace({ profile, recheck, scope, feed, onFeedChange }: Props & { scope: SpotScope }) {
   const [center, setCenter] = useState<Center | null>(pilotCenter)
   const [centerSource, setCenterSource] = useState<'pilot' | 'manual' | null>(pilotCenter ? 'pilot' : null)
   const [draftLat, setDraftLat] = useState(pilotCenter ? String(pilotCenter.latitude) : '')
@@ -185,10 +182,13 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
   const [listKey, setListKey] = useState('')
   const resultsController = useRef(new ScopedResultsController())
   const [queryDraft, setQueryDraft] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchInput = useRef<HTMLInputElement | null>(null)
   const [submittedQuery, setSubmittedQuery] = useState('')
   const [queryError, setQueryError] = useState('')
   const [searchResult, setSearchResult] = useState<SearchResult | null>(null)
   const [searchRetry, setSearchRetry] = useState(0)
+  const [mapOpen, setMapOpen] = useState(false)
   const [detail, setDetail] = useState<Spot | null>(null)
   const [detailStatus, setDetailStatus] = useState('')
   const [mode, setMode] = useState<'list' | 'detail' | 'add' | 'edit' | 'profile'>('list')
@@ -199,10 +199,16 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
   const refresh = () => setRevision(n => n + 1)
   if (!centerLocation.current) centerLocation.current = new SpotLocationController(() => navigator.geolocation, state => {
     setCenterLocationState(state)
-    if (state.kind === 'success') {
-      setDraftLat(state.latitude)
-      setDraftLon(state.longitude)
-      setCenterMessage('Current location staged. Confirm the discovery center before Public results change.')
+     if (state.kind === 'success') {
+       setDraftLat(state.latitude)
+       setDraftLon(state.longitude)
+       const next = normalizeCenter(Number(state.latitude), Number(state.longitude))
+       if (next) {
+         resultsController.current.invalidate()
+         setCenter(next)
+         setCenterSource('manual')
+         setCenterMessage('Current location selected. Public spots are loading.')
+       }
     }
   })
   useEffect(() => () => centerLocation.current?.dispose(), [])
@@ -214,6 +220,9 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
   const visibleSearchResult = listKey === requestKey ? searchResult : null
   const enteredCenter = normalizeCenter(draftLat.trim() ? Number(draftLat) : NaN, draftLon.trim() ? Number(draftLon) : NaN)
   const stagedCenter = enteredCenter && (!center || enteredCenter.latitude !== center.latitude || enteredCenter.longitude !== center.longitude) ? enteredCenter : null
+
+  useEffect(() => { if (searchOpen) searchInput.current?.focus() }, [searchOpen])
+  useEffect(() => { resultsController.current.invalidate(); back() }, [feed])
 
   useEffect(() => {
     setSpots([])
@@ -264,6 +273,12 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
     setQueryDraft(''); setSubmittedQuery(''); setQueryError(''); setSearchRetry(n => n + 1)
   }
   function retrySearch() { resultsController.current.invalidate(); setSpots([]); setSearchResult(null); setSearchRetry(n => n + 1) }
+
+  function toggleMap() {
+    if (mapOpen) { setMapOpen(false); return }
+    setMapOpen(true)
+    if (!center && !visibleSpots.length) centerLocation.current?.request()
+  }
 
   function chooseCenter(event: FormEvent) {
     event.preventDefault()
@@ -355,42 +370,32 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
   }
 
   return <section className="workspace-shell" aria-label="Spot workspace">
-    <div className="workspace-heading">
-      <div><p className="workspace-kicker">Discover</p><h1 className="mt-1 text-3xl font-bold tracking-[-0.04em] text-[var(--forest-950)]">{mode === 'list' ? (feed === 'public' ? 'Public discoveries' : 'Your connections') : mode === 'profile' ? 'Your profile' : mode === 'detail' ? 'Spot detail' : mode === 'edit' ? 'Edit your spot' : 'Add a spot'}</h1></div>
-      {mode === 'list' && <p className="hidden rounded-full bg-[var(--opal-100)] px-3 py-2 text-sm font-semibold text-[var(--forest-950)] sm:block">{visibleSpots.length ? `${visibleSpots.length} nearby` : 'Make time to notice'}</p>}
-    </div>
+     <div className="workspace-heading">
+       <div><p className="workspace-kicker">Discover</p><h1 className="mt-1 text-3xl font-bold tracking-[-0.04em] text-[var(--forest-950)]">{mode === 'list' ? (feed === 'public' ? 'Public discoveries' : 'Your connections') : mode === 'profile' ? 'Your profile' : mode === 'detail' ? 'Spot detail' : mode === 'edit' ? 'Edit your spot' : 'Add a spot'}</h1></div>
+       {mode === 'list' && <p className="hidden rounded-full bg-[var(--opal-100)] px-3 py-2 text-sm font-semibold text-[var(--forest-950)] lg:block">{visibleSpots.length ? `${visibleSpots.length} nearby` : 'Make time to notice'}</p>}
+     </div>
     <nav className="workspace-nav" aria-label="Primary">
       <button type="button" className="nav-item" aria-current={mode === 'list' ? 'page' : undefined} onClick={() => navigateTo('list')}><ExploreIcon className="h-5 w-5" /><span>Discover</span></button>
       <button type="button" className="nav-item" aria-current={mode === 'add' || mode === 'edit' ? 'page' : undefined} onClick={() => navigateTo('add')}><PlusIcon className="h-5 w-5" /><span>Add spot</span></button>
       <button type="button" className="nav-item" aria-current={mode === 'profile' ? 'page' : undefined} onClick={() => navigateTo('profile')}><PersonIcon className="h-5 w-5" /><span>Profile</span></button>
     </nav>
-    {mode === 'list' && <div className="mt-6 flex justify-center"><div role="group" aria-label="Discovery feed" className="inline-flex w-full max-w-md rounded-xl border border-[var(--control-outline)] bg-[var(--surface)] p-1">
-       {(['connections', 'public'] as const).map(value => <button key={value} type="button" aria-pressed={feed === value} className={`${button} flex-1 border-0 ${feed === value ? 'ui-button-selected' : ''}`} onClick={() => { if (feed !== value) { resultsController.current.invalidate(); back(); setFeed(value) } }}>{value === 'public' ? <GlobeIcon className="h-4 w-4" /> : <UsersIcon className="h-4 w-4" />}<span>{value === 'public' ? 'Public' : 'Connections'}</span></button>)}
-    </div></div>}
-    {mode === 'list' && <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">{feed === 'public' ? `Public posts within your saved ${settings.publicRadiusKm} km straight-line radius of the ${centerSource === 'pilot' ? 'configured pilot area' : centerSource === 'manual' ? 'chosen manual area' : 'center you choose'}. Distance is approximate, not travel time.` : 'Newest spots from you and your enrolled connections, including their Public posts.'} The server determines eligibility.</p>}
-    {mode === 'list' && <>
-      {feed === 'public' && <div className="mt-4 rounded-lg border border-stone-300 p-3">
-        <h4 className="font-semibold">Discovery center</h4>
-        <p className="text-sm">{center ? `${centerSource === 'pilot' ? 'Configured pilot area' : 'Manually chosen area'}: ${center.latitude}, ${center.longitude}. Not your current location unless you explicitly choose it. Map panning does not change discovery.` : 'No pilot area is configured. Choose and confirm a manual center below. No device location is requested until you explicitly choose the button.'}</p>
-        <button type="button" className={`${button} mt-3`} disabled={centerLocationState.kind === 'pending'} onClick={() => centerLocation.current?.request()} aria-describedby="center-location-status"><LocateIcon className="h-5 w-5" />{centerLocationState.kind === 'pending' ? 'Finding current location…' : 'Use current location'}</button>
-        <p id="center-location-status" role="status" className="mt-2 text-sm">{centerLocationState.kind === 'pending' ? 'Waiting for your browser location. The result will be staged below and will not change Public results until you confirm it.' : centerLocationState.kind === 'success' ? 'Current location staged in the fields below. Review it, then confirm the discovery center.' : centerLocationState.kind === 'permissionDenied' ? 'Location permission denied. Change browser permissions to retry, or enter coordinates manually.' : centerLocationState.kind === 'unsupported' ? 'This browser does not support location. Enter coordinates manually or choose a point on the map.' : centerLocationState.kind === 'unavailable' ? 'Location unavailable or timed out. Try again, or enter coordinates manually.' : 'Optional: use your current location to stage a discovery center, or enter coordinates manually.'}</p>
-        <form onSubmit={chooseCenter} className="mt-3 space-y-2"><div className="grid gap-3 sm:grid-cols-2"><label>Center latitude (-90 to 90)<input className={input} type="number" inputMode="decimal" min={-90} max={90} step="any" value={draftLat} onChange={e => setDraftLat(e.target.value)} /></label><label>Center longitude (-180 to 180)<input className={input} type="number" inputMode="decimal" min={-180} max={180} step="any" value={draftLon} onChange={e => setDraftLon(e.target.value)} /></label></div>
-           <button type="submit" className={button}><CheckIcon className="h-5 w-5" />Confirm discovery center</button>
+       {mode === 'list' && <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--ink-muted)]">{feed === 'public' ? `Public posts within your saved ${settings.publicRadiusKm} km straight-line radius of the ${centerSource === 'pilot' ? 'configured pilot area' : centerSource === 'manual' ? 'chosen manual area' : 'center you choose'}. Distance is approximate, not travel time.` : 'Newest spots from you and your enrolled connections, including their Public posts.'} </p>}
+      {mode === 'list' && <div className="mt-4 flex items-center gap-2">
+        <form onSubmit={submitSearch} className="flex min-w-0 flex-1 items-center gap-2" role="search">
+        <label className="sr-only" htmlFor="spot-query">Search spots</label>
+        {!searchOpen ? <button type="button" className={`${button} shrink-0`} aria-label="Open search" title="Search spots" onClick={() => setSearchOpen(true)}><SearchIcon className="h-5 w-5" /></button> : <><div className="relative min-w-0 flex-1"><input ref={searchInput} id="spot-query" className={`${input} pr-12`} type="search" maxLength={200} placeholder="Search spots by meaning…" value={queryDraft} onChange={event => setQueryDraft(event.target.value)} />{<button type="button" className="absolute right-1 top-1/2 -translate-y-1/2 ui-button min-h-12 w-12 rounded-xl" onClick={() => { if (queryDraft || submittedQuery) clearSearch(); else setSearchOpen(false) }} aria-label={queryDraft || submittedQuery ? 'Clear search' : 'Close search'} title={queryDraft || submittedQuery ? 'Clear search' : 'Close search'}><XIcon className="h-4 w-4" /></button>}</div><button type="submit" className={`${button} shrink-0`} aria-label="Submit search" title="Search"><SearchIcon className="h-5 w-5" /></button></>}
         </form>
-          {pilotCenter && centerSource !== 'pilot' && <button type="button" className={`${button} mt-2`} onClick={() => { const fallback = pilotCenter; if (!fallback) return; resultsController.current.invalidate(); setCenter(fallback); setCenterSource('pilot'); setDraftLat(String(fallback.latitude)); setDraftLon(String(fallback.longitude)); setCenterMessage('Configured pilot area restored.') }}><MapPinIcon className="h-5 w-5" />Use configured pilot area</button>}
-        {centerMessage && <p role="status" className="mt-2">{centerMessage}</p>}
-        <p className="mt-2 text-sm">Enter approximate coordinates to display the map, or tap it to stage a center; confirm before Public results change. Numeric entry works without map tiles.</p>
-       </div>}
-       <form onSubmit={submitSearch} className="mt-4 space-y-2" role="search">
-         <label className="block font-medium" htmlFor="spot-query">Find spots by meaning (max 200 characters)</label>
-         <input id="spot-query" className={input} type="search" value={queryDraft} onChange={e => setQueryDraft(e.target.value)} aria-describedby="search-help" />
-         <p id="search-help" className="text-sm">Submit to search the selected feed. Changing this draft does not update results until you select Find spots.</p>
-          <div className="flex flex-wrap gap-2"><button type="submit" className={`${button} ui-button-primary`}><SearchIcon className="h-5 w-5" />Find spots</button><button type="button" className={button} onClick={clearSearch}><XIcon className="h-5 w-5" />Clear search</button></div>
-         {queryError && <p role="alert" className="text-red-800">{queryError}</p>}
-       </form>
-       {submittedQuery && <h4 className="mt-4 font-semibold">Semantic matches <span className="text-sm font-normal">for your submitted query (up to 3, original member notes)</span></h4>}
-       <div className="mt-5 flex flex-wrap gap-2"><button className={`${button} ui-button-primary`} onClick={() => { resultsController.current.invalidate(); refresh() }}><RefreshIcon className="h-5 w-5" />Reload {submittedQuery ? 'search' : feed === 'public' ? 'Public' : 'Connections'}</button></div>
-      <div className="mt-4"><SpotMap center={feed === 'public' && center ? [center.latitude, center.longitude] : undefined} stagedCenter={feed === 'public' && stagedCenter ? [stagedCenter.latitude, stagedCenter.longitude] : undefined} viewCenter={feed === 'public' && stagedCenter ? [stagedCenter.latitude, stagedCenter.longitude] : feed === 'connections' && visibleSpots.length ? [visibleSpots[0].latitude, visibleSpots[0].longitude] : undefined} radiusKm={feed === 'public' && center ? settings.publicRadiusKm : undefined} spots={visibleSpots} selectedId={selectedId} onSelect={openDetail} onPick={feed === 'public' ? (lat, lon) => { const next = normalizeCenter(lat, lon); if (next) { setDraftLat(String(lat)); setDraftLon(String(lon)); setCenterMessage('Map center staged. Results still use the confirmed center until you confirm this one.') } } : undefined} /></div>
+        <button type="button" className={`${button} shrink-0`} aria-label={`Reload ${submittedQuery ? 'search' : feed === 'public' ? 'Public' : 'Connections'}`} title="Reload" onClick={() => { resultsController.current.invalidate(); refresh() }}><RefreshIcon className="h-5 w-5" /></button>
+      </div>}
+    {mode === 'list' && <>
+          {queryError && <p role="alert" className="mt-4 text-red-800">{queryError}</p>}
+        {submittedQuery && <h4 className="mt-4 font-semibold">Semantic matches <span className="text-sm font-normal">for your submitted query (up to 3, original member notes)</span></h4>}
+        {feed === 'public' && <p className="mt-5 text-sm text-[var(--ink-muted)]">Tap the current-location button to load nearby Public spots.</p>}
+        <div className="mt-5 flex items-center gap-2">
+          <button type="button" className={button} onClick={toggleMap} aria-expanded={mapOpen} aria-controls="spot-map-view"><MapPinIcon className="h-5 w-5" />{mapOpen ? 'Hide map' : 'Explore with map'}</button>
+          <button type="button" className={`${button} shrink-0`} disabled={centerLocationState.kind === 'pending'} onClick={() => centerLocation.current?.request()} aria-label={centerLocationState.kind === 'pending' ? 'Finding current location' : 'Use current location'} title={centerLocationState.kind === 'pending' ? 'Finding current location' : 'Use current location'}><LocateIcon className="h-5 w-5" /></button>
+       </div>
+        {mapOpen && <div id="spot-map-view" className="mt-4">{!center && !visibleSpots.length ? <p role="status">{centerLocationState.kind === 'pending' ? 'Finding your current location to open the map…' : centerLocationState.kind === 'permissionDenied' ? 'Location permission denied. Use the location button to retry.' : centerLocationState.kind === 'unsupported' ? 'This browser does not support location.' : centerLocationState.kind === 'unavailable' ? 'Location unavailable or timed out. Use the location button to retry.' : 'Finding your current location to open the map…'}</p> : <SpotMap center={feed === 'public' && center ? [center.latitude, center.longitude] : undefined} stagedCenter={feed === 'public' && stagedCenter ? [stagedCenter.latitude, stagedCenter.longitude] : undefined} viewCenter={feed === 'public' && stagedCenter ? [stagedCenter.latitude, stagedCenter.longitude] : feed === 'connections' && visibleSpots.length ? [visibleSpots[0].latitude, visibleSpots[0].longitude] : feed === 'connections' && center ? [center.latitude, center.longitude] : undefined} radiusKm={feed === 'public' && center ? settings.publicRadiusKm : undefined} spots={visibleSpots} selectedId={selectedId} onSelect={openDetail} onPick={feed === 'public' ? (lat, lon) => { const next = normalizeCenter(lat, lon); if (next) { setDraftLat(String(lat)); setDraftLon(String(lon)); setCenterMessage('Map center staged. Results still use the confirmed center until you confirm this one.') } } : undefined} />}</div>}
        {visibleStatus && <p role={visiblePhase === 'error' ? 'alert' : 'status'} className="mt-4">{visibleStatus}</p>}
        {submittedQuery && !visibleSearchResult && visiblePhase === 'error' && <button type="button" className={button} onClick={retrySearch}>Retry search</button>}
       {detailStatus && <p role="alert" className="mt-4 text-red-800">{detailStatus}</p>}
@@ -402,16 +407,15 @@ function LiveWorkspace({ profile, recheck, scope }: Props & { scope: SpotScope }
          <button className={`${button} mt-4 w-full`} onFocus={() => setSelectedId(spot.id)} onBlur={() => setSelectedId(null)} onMouseEnter={() => setSelectedId(spot.id)} onMouseLeave={() => setSelectedId(null)} onClick={() => openDetail(spot.id)}>Open spot</button></div>
        </li>)}</ul>
     </>}
-     {mode === 'profile' && <div className="surface card mt-6 space-y-5 p-4 sm:p-6"><button className={button} onClick={() => setMode('list')}><ArrowLeftIcon className="h-5 w-5" />Back to {feed === 'public' ? 'Public' : 'Connections'}</button><div><p className="workspace-kicker">Your settings</p><h4 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[var(--forest-950)]">Profile</h4></div><div className="rounded-xl bg-[var(--surface-muted)] p-4"><p className="text-sm text-[var(--ink-muted)]">Display name</p><p className="mt-1 font-semibold">{settings.displayName}</p><p className="mt-3 text-sm text-[var(--ink-muted)]">Saved Public discovery radius</p><p className="mt-1 font-semibold">{settings.publicRadiusKm} km</p></div><form onSubmit={e => void submitRadius(e)} className="space-y-4"><label className="field-label">Public discovery radius (1–25 km)<input className={input} type="number" min={1} max={25} step={1} inputMode="numeric" value={radiusDraft} disabled={radiusPending} onChange={e => setRadiusDraft(e.target.value)} /></label><p className="text-sm leading-6 text-[var(--ink-muted)]">Public discovery uses straight-line distance from the area you confirm. It does not track your live location.</p><button className={`${button} ui-button-primary`} disabled={radiusPending}><CheckIcon className="h-5 w-5" />{radiusPending ? 'Saving radius…' : 'Save radius'}</button></form>{radiusMessage && <p role="status" className="rounded-xl bg-[var(--opal-100)] p-3 text-sm">{radiusMessage}</p>}{radiusError && <p role="alert" className="rounded-xl bg-[var(--error-surface)] p-3 text-sm text-[var(--error-text)]">{radiusError} Saved value remains {settings.publicRadiusKm} km.</p>}</div>}
+      {mode === 'profile' && <div className="surface card mt-6 space-y-5 p-4 sm:p-6"><div><p className="workspace-kicker">Your settings</p><h4 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-[var(--forest-950)]">Profile</h4></div><div className="rounded-xl bg-[var(--surface-muted)] p-4"><p className="text-sm text-[var(--ink-muted)]">Display name</p><p className="mt-1 font-semibold">{settings.displayName}</p><p className="mt-3 text-sm text-[var(--ink-muted)]">Saved Public discovery radius</p><p className="mt-1 font-semibold">{settings.publicRadiusKm} km</p></div><form onSubmit={e => void submitRadius(e)} className="space-y-4"><label className="field-label">Public discovery radius (1–25 km)<input className={input} type="number" min={1} max={25} step={1} inputMode="numeric" value={radiusDraft} disabled={radiusPending} onChange={e => setRadiusDraft(e.target.value)} /></label><p className="text-sm leading-6 text-[var(--ink-muted)]">Public discovery uses straight-line distance from the area you confirm. It does not track your live location.</p><button className={`${button} ui-button-primary`} disabled={radiusPending}><CheckIcon className="h-5 w-5" />{radiusPending ? 'Saving radius…' : 'Save radius'}</button></form>{radiusMessage && <p role="status" className="rounded-xl bg-[var(--opal-100)] p-3 text-sm">{radiusMessage}</p>}{radiusError && <p role="alert" className="rounded-xl bg-[var(--error-surface)] p-3 text-sm text-[var(--error-text)]">{radiusError} Saved value remains {settings.publicRadiusKm} km.</p>}</div>}
     {mode === 'detail' && <>
-       <button className={button} onClick={back}><ArrowLeftIcon className="h-5 w-5" />Back to {feed === 'public' ? 'Public' : 'Connections'}</button>
       {detailStatus && <p role="status" className="mt-4">{detailStatus}</p>}
        {detail && <article className="surface card mt-6 space-y-4 p-4 sm:p-6">
          <p className="eyebrow">{detail.audience === 'public' ? 'Public discovery' : 'Connections only'}</p><h4 className="text-3xl font-semibold tracking-[-0.04em] text-[var(--forest-950)]">{detail.title}</h4>
         <ProtectedPhoto spot={detail} scope={scope} profile={profile} recheck={recheck} />
          <p className="whitespace-pre-wrap break-words leading-7">{detail.note}</p><p className="text-sm text-[var(--ink-muted)]">Shared by {detail.authorName} · {detail.audience === 'public' ? 'Public to enrolled pilot members' : 'Connections only'}</p>
-         <div className="rounded-xl bg-[var(--surface-muted)] p-4"><p className="font-semibold">Access information</p><p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">Poster confirmed public physical access; not independently verified. {detail.accessNote || 'No additional access restrictions supplied.'}</p></div>
-         <details className="rounded-xl border border-[var(--line)] p-4"><summary className="cursor-pointer font-semibold">Show destination map</summary><p className="mt-3 text-sm text-[var(--ink-muted)]">Destination: {detail.latitude}, {detail.longitude}</p><div className="mt-3"><SpotMap pin={[detail.latitude, detail.longitude]} /></div></details>
+          <div className="rounded-xl bg-[var(--surface-muted)] p-4"><p className="flex items-center gap-2 font-semibold"><MapPinIcon className="h-5 w-5" />Access information</p><p className="mt-1 text-sm leading-6 text-[var(--ink-muted)]">Poster confirmed public physical access; not independently verified. {detail.accessNote || 'No additional access restrictions supplied.'}</p></div>
+          <details className="rounded-xl border border-[var(--line)] p-4"><summary className="flex cursor-pointer items-center gap-2 font-semibold"><MapPinIcon className="h-5 w-5" />Show destination map</summary><p className="mt-3 text-sm text-[var(--ink-muted)]">Destination: {detail.latitude}, {detail.longitude}</p><div className="mt-3"><SpotMap pin={[detail.latitude, detail.longitude]} /></div></details>
          <p className="text-sm leading-6 text-[var(--ink-muted)]">Directions open Google Maps outside this app and send it the destination coordinates. No safe route or travel time is verified.</p>
            <a className={`${button} ui-button-primary w-full sm:w-auto`} target="_blank" rel="noopener noreferrer" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${detail.latitude},${detail.longitude}`)}`}><DirectionsIcon className="h-5 w-5" />Open directions (external)</a>
           <ExploredControl key={`${profile.id}:${detail.id}`} memberId={profile.id} spotId={detail.id} recheck={recheck} onMissing={exploredSpotMissing} />

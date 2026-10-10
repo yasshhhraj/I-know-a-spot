@@ -65,3 +65,7 @@ export function PhotoIcon(props: IconProps) {
 export function XIcon(props: IconProps) {
   return <Icon {...props}><path d="m6 6 12 12M18 6 6 18" /></Icon>
 }
+
+export function SignOutIcon(props: IconProps) {
+  return <Icon {...props}><path d="M10 5H5a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h5" /><path d="m14 16 4-4-4-4M8 12h10" /></Icon>
+}
