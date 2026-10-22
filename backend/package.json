@@ -10,7 +10,7 @@
     "dev": "node --env-file-if-exists=.env --import tsx --watch src/server.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc",
-    "start": "node --env-file-if-exists=.env dist/server.js",
+    "start": "node dist/server.js",
     "test": "vitest run"
   },
   "dependencies": {
