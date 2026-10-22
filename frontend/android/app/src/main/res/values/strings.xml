@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">ikas</string>
+    <string name="title_activity_main">ikas</string>
+    <string name="package_name">com.ikas.app</string>
+    <string name="custom_url_scheme">com.ikas.app</string>
+</resources>

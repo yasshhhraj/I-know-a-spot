@@ -8,6 +8,7 @@ export default defineConfig({
   base: (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.GITHUB_ACTIONS ? '/I-know-a-spot/' : '/',
   plugins: [react(), tailwindcss()],
   build: {
+    target: 'chrome120',
     rollupOptions: {
       // Temporary workaround: installed Rollup hangs optimizing the React graph.
       // Keep compilation/minification, but retain code rather than pruning it.
