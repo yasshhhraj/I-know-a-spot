@@ -55,8 +55,16 @@ export function createApp(
   });
 
   // Plugins
+  const allowedOrigins = new Set([config.frontendOrigin]);
+
   app.register(cors, {
-    origin: config.frontendOrigin,
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true);
+      if (allowedOrigins.has(origin)) return cb(null, true);
+      if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
+      if (origin === 'capacitor://localhost') return cb(null, true);
+      return cb(null, false);
+    },
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Authorization', 'Content-Type'],
   });
