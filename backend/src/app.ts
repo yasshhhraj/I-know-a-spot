@@ -61,12 +61,12 @@ export function createApp(
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
       if (allowedOrigins.has(origin)) return cb(null, true);
-      if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
+      if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
       if (origin === 'capacitor://localhost') return cb(null, true);
       return cb(null, false);
     },
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Authorization', 'Content-Type'],
+    allowedHeaders: ['Authorization', 'Content-Type', 'ngrok-skip-browser-warning'],
   });
 
   app.register(multipart, {

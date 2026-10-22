@@ -86,7 +86,7 @@ export async function spotRequest(base: string, token: string, path: string, sig
   else signal.addEventListener('abort', abort, { once: true })
   const timer = setTimeout(abort, requestTimeout)
   try {
-    const response = await fetch(`${base}${path}`, { method, body, headers: { Authorization: `Bearer ${token}`, ...(contentType ? { 'Content-Type': contentType } : {}) }, cache: 'no-store', signal: request.signal })
+    const response = await fetch(`${base}${path}`, { method, body, headers: { Authorization: `Bearer ${token}`, ...(contentType ? { 'Content-Type': contentType } : {}), ...(base.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } : {}) }, cache: 'no-store', signal: request.signal })
     if (request.signal.aborted) throw new SpotApiError(safeFailure(0, null, mutation))
     if (response.status === 204 && method === 'DELETE') return null
     if (path.endsWith('/photo') && response.ok) {

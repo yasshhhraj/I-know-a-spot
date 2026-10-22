@@ -2,7 +2,7 @@
 import { configuredPilotCenter } from './discovery'
 export { normalizeCenter } from './discovery'
 export type { Center } from './discovery'
-export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '') ?? ''
+export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/+$/, '').replace(/\/api$/, '') ?? ''
 
 /** The pilot area is a labelled fallback, never a device location or [0, 0]. */
 export const pilotCenter = configuredPilotCenter(import.meta.env.VITE_PILOT_CENTER_LAT, import.meta.env.VITE_PILOT_CENTER_LON)

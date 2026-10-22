@@ -37,7 +37,7 @@ export class SpotLocationController {
           : { kind: 'unavailable' })
       }, error => {
         if (revision === this.revision) this.set({ kind: error?.code === 1 ? 'permissionDenied' : 'unavailable' })
-      }, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 })
+      }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
     } catch {
       if (revision === this.revision) this.set({ kind: 'unavailable' })
     }

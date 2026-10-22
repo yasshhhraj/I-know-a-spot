@@ -46,7 +46,7 @@ export async function submitReport(base: string, token: string, spotId: string, 
   try {
     if (request.signal.aborted) throw uncertain()
     const response = await Promise.race([fetch(`${base}/spots/${spotId}/reports`, {
-      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(base.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } : {}) },
       body: JSON.stringify({ reason }), cache: 'no-store', signal: request.signal,
     }), aborted])
     if (request.signal.aborted) throw uncertain()

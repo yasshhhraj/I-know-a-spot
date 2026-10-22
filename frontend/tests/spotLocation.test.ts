@@ -10,7 +10,7 @@ function harness() {
   const port: LocationPort = { getCurrentPosition(ok, fail, options) {
     calls++
     success = ok; failure = fail
-    assert.deepEqual(options, { enableHighAccuracy: false, timeout: 10000, maximumAge: 0 })
+    assert.deepEqual(options, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
   } }
   const controller = new SpotLocationController(() => port, state => states.push(state))
   return { controller, states, get calls() { return calls }, success: (lat: number, lon: number) => success({ coords: { latitude: lat, longitude: lon } }), failure: (code: number) => failure({ code }) }

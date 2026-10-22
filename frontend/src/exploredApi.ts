@@ -40,7 +40,7 @@ export async function exploredRequest(base: string, token: string, spotId: strin
     if (request.signal.aborted) throw failure(0, write)
     const response = await fetch(`${base}/spots/${spotId}/explored`, {
       method: write ? 'PUT' : 'GET',
-      headers: { Authorization: `Bearer ${token}`, ...(write ? { 'Content-Type': 'application/json' } : {}) },
+      headers: { Authorization: `Bearer ${token}`, ...(write ? { 'Content-Type': 'application/json' } : {}), ...(base.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } : {}) },
       ...(write ? { body: JSON.stringify({ explored: desired }) } : {}), cache: 'no-store', signal: request.signal,
     })
     if (request.signal.aborted) throw failure(0, write)

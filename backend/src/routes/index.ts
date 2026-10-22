@@ -45,12 +45,19 @@ export function registerAllRoutes(
   const reportsController = new ReportsController(spotStore, reportStore, profileProvider);
 
   // Register route groups
-  registerHealthRoutes(app, healthController);
-  registerMeRoutes(app, meController);
-  registerSpotsRoutes(app, {
-    spotsController,
-    searchController,
-    exploredController,
-    reportsController,
-  });
+  const registerRoutes = (instance: FastifyInstance) => {
+    registerHealthRoutes(instance, healthController);
+    registerMeRoutes(instance, meController);
+    registerSpotsRoutes(instance, {
+      spotsController,
+      searchController,
+      exploredController,
+      reportsController,
+    });
+  };
+
+  registerRoutes(app);
+  app.register(async (api) => {
+    registerRoutes(api);
+  }, { prefix: '/api' });
 }

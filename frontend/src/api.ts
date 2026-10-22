@@ -34,7 +34,7 @@ export async function saveRadius(baseUrl: string, token: string, userId: string,
   else signal.addEventListener('abort', abort, { once: true })
   const timer = setTimeout(abort, 35_000)
   try {
-    const response = await fetch(`${baseUrl}/me`, { method: 'PATCH', body: JSON.stringify({ publicRadiusKm: radius }), headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, cache: 'no-store', signal: request.signal })
+    const response = await fetch(`${baseUrl}/me`, { method: 'PATCH', body: JSON.stringify({ publicRadiusKm: radius }), headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(baseUrl.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } : {}) }, cache: 'no-store', signal: request.signal })
     if (request.signal.aborted) throw new RadiusError('uncertain', 'Radius save may have completed. Reload and verify your profile before saving again.')
     let body: unknown
     try { body = await response.json() } catch { throw new RadiusError('uncertain', 'Radius save response could not be verified. Reload and verify your profile before saving again.') }
@@ -62,7 +62,7 @@ export function parseMe(status: number, body: unknown, userId: string): MeResult
   return { kind: 'outage' }
 }
 
-export async function fetchMe(baseUrl: string, token: string, userId: string, signal: AbortSignal, timeoutMs = 15_000): Promise<MeResult> {
+export async function fetchMe(baseUrl: string, token: string, userId: string, signal: AbortSignal, timeoutMs = 45_000): Promise<MeResult> {
   // Abort both on caller invalidation (sign-out/account switch) and a stalled request.
   // A local controller avoids relying on AbortSignal.any/timeout on older mobile browsers.
   const request = new AbortController()
@@ -72,7 +72,10 @@ export async function fetchMe(baseUrl: string, token: string, userId: string, si
   const timer = setTimeout(() => request.abort(), timeoutMs)
   try {
     const response = await fetch(`${baseUrl}/me`, {
-      headers: { Authorization: `Bearer ${token}` },
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(baseUrl.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } : {}),
+      },
       cache: 'no-store',
       signal: request.signal,
     })

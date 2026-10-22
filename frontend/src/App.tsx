@@ -1,4 +1,6 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
+import { App as CapApp } from '@capacitor/app'
+import { Capacitor } from '@capacitor/core'
 import { apiBaseUrl, hasApiConfig } from './config'
 import { getSupabaseClient } from './supabase'
 import { fetchMe } from './api'
@@ -44,6 +46,27 @@ export default function App() {
       return
     }
     const auth = client.auth
+
+    let cleanupAppListener: (() => void) | undefined
+    if (Capacitor.isNativePlatform()) {
+      const listenerPromise = CapApp.addListener('appUrlOpen', async ({ url }) => {
+        if (url.startsWith('com.ikas.app://auth-callback')) {
+          const rawParams = url.split('#')[1] || url.split('?')[1]
+          if (rawParams) {
+            const params = new URLSearchParams(rawParams)
+            const access_token = params.get('access_token')
+            const refresh_token = params.get('refresh_token')
+            if (access_token && refresh_token) {
+              await client.auth.setSession({ access_token, refresh_token })
+            }
+          }
+        }
+      })
+      cleanupAppListener = () => {
+        listenerPromise.then(handle => handle.remove()).catch(() => {})
+      }
+    }
+
     const gate = new AuthController({
       getSession: async () => {
         const { data, error } = await auth.getSession()
@@ -58,9 +81,9 @@ export default function App() {
         return { session: data.session, error }
       },
       signInWithGoogle: async () => {
-        // Return to the origin the user is currently using (localhost, a tunnel,
-        // or the deployed site). Each origin still must be allowlisted in Supabase.
-        const redirectTo = `${window.location.origin}${window.location.pathname}`
+        const redirectTo = Capacitor.isNativePlatform()
+          ? 'com.ikas.app://auth-callback'
+          : `${window.location.origin}${window.location.pathname}`
         const { error } = await auth.signInWithOAuth({
           provider: 'google',
           options: { redirectTo },
@@ -74,7 +97,10 @@ export default function App() {
     }, (token, userId, signal) => fetchMe(apiBaseUrl, token, userId, signal), setView)
     gate.start()
     setController(gate)
-    return () => gate.dispose()
+    return () => {
+      cleanupAppListener?.()
+      gate.dispose()
+    }
   }, [])
 
   async function submit(event: FormEvent<HTMLFormElement>) {

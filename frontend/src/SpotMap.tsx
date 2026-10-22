@@ -36,7 +36,7 @@ function CurrentLocationControl({ onLocate }: { onLocate?: (lat: number, lng: nu
     navigator.geolocation.getCurrentPosition(
       position => { const lat = position.coords.latitude; const lng = position.coords.longitude; map.setView([lat, lng], Math.max(map.getZoom(), 15)); onLocate?.(lat, lng); setPending(false) },
       () => setPending(false),
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
     )
   }
   return <button type="button" className="map-location-button" onClick={locate} disabled={pending || !navigator.geolocation} aria-label={pending ? 'Finding current location' : 'Center map on current location'} title={pending ? 'Finding current location' : 'Center map on current location'}><LocateIcon className="h-5 w-5" /></button>

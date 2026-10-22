@@ -60,7 +60,7 @@ export async function searchSpots(base: string, token: string, query: string, fe
   try {
     if (request.signal.aborted) throw unavailable()
     const response = await fetch(`${base}/spots/search`, {
-      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      method: 'POST', headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json', ...(base.includes('ngrok') ? { 'ngrok-skip-browser-warning': 'true' } : {}) },
       body: JSON.stringify(body), cache: 'no-store', signal: request.signal,
     })
     if (request.signal.aborted) throw unavailable()

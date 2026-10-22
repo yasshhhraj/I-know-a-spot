@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from 'react'
+import { Camera, CameraResultType, CameraSource } from '@capacitor/camera'
+import { Capacitor } from '@capacitor/core'
 import { radiusValue, RadiusError, saveRadius, type Profile } from './api'
 import { getSupabaseClient } from './supabase'
 import { apiBaseUrl, normalizeCenter, pilotCenter, type Center } from './config'
@@ -79,6 +81,45 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
   }
   const pin = Number(fields.latitude) >= -90 && Number(fields.latitude) <= 90 && Number(fields.longitude) >= -180 && Number(fields.longitude) <= 180 && fields.latitude.trim() !== '' && fields.longitude.trim() !== '' ? [Number(fields.latitude), Number(fields.longitude)] as [number, number] : null
 
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
+  const galleryInputRef = useRef<HTMLInputElement | null>(null)
+
+  async function capturePhoto(source: 'camera' | 'photos') {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const image = await Camera.getPhoto({
+          quality: 90,
+          allowEditing: false,
+          resultType: CameraResultType.Uri,
+          source: source === 'camera' ? CameraSource.Camera : CameraSource.Photos,
+        })
+        if (image.webPath) {
+          const res = await fetch(image.webPath)
+          const blob = await res.blob()
+          const mime = blob.type && blob.type.startsWith('image/')
+            ? blob.type
+            : (image.format === 'png' ? 'image/png' : image.format === 'webp' ? 'image/webp' : 'image/jpeg')
+          const capturedFile = new File([blob], `photo_${Date.now()}.${image.format || 'jpg'}`, { type: mime })
+          const problem = validatePhoto(capturedFile)
+          if (problem) { setMessage(problem); return }
+          setMessage('')
+          setFile(capturedFile)
+        }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message.toLowerCase() : ''
+        if (!msg.includes('cancel')) {
+          console.error('Photo capture error:', err)
+        }
+      }
+    } else {
+      if (source === 'camera') {
+        cameraInputRef.current?.click()
+      } else {
+        galleryInputRef.current?.click()
+      }
+    }
+  }
+
   function selectPhoto(event: ChangeEvent<HTMLInputElement>) {
     const next = event.target.files?.[0]
     event.target.value = '' // Selecting the same file again should still work.
@@ -135,8 +176,45 @@ function Form({ initial, original, scope, profile, recheck, onSaved, onCancel, r
     {!original && <>
       <p className="text-sm leading-6 text-[var(--ink-muted)]">One photo, up to 10 MiB: JPEG, PNG or WebP. HEIC and animated images are unsupported. </p>
        <div className="flex items-center gap-3">
-         <label className={`${button} w-12 px-0`} title="Take photo" aria-label="Take photo with camera where supported"><CameraIcon className="h-5 w-5" /><input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" onChange={selectPhoto} disabled={pending} aria-label="Take photo with camera where supported" /></label>
-         <label className={`${button} w-12 px-0`} title="Choose photo" aria-label="Choose a photo from device"><PhotoIcon className="h-5 w-5" /><input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp" onChange={selectPhoto} disabled={pending} aria-label="Choose a photo from device" /></label>
+         <button
+           type="button"
+           className={`${button} w-12 px-0`}
+           title="Take photo"
+           aria-label="Take photo with camera"
+           disabled={pending}
+           onClick={() => void capturePhoto('camera')}
+         >
+           <CameraIcon className="h-5 w-5" />
+         </button>
+         <button
+           type="button"
+           className={`${button} w-12 px-0`}
+           title="Choose photo"
+           aria-label="Choose a photo from device"
+           disabled={pending}
+           onClick={() => void capturePhoto('photos')}
+         >
+           <PhotoIcon className="h-5 w-5" />
+         </button>
+         <input
+           ref={cameraInputRef}
+           className="sr-only"
+           type="file"
+           accept="image/*"
+           capture="environment"
+           onChange={selectPhoto}
+           disabled={pending}
+           aria-hidden="true"
+         />
+         <input
+           ref={galleryInputRef}
+           className="sr-only"
+           type="file"
+           accept="image/jpeg,image/png,image/webp"
+           onChange={selectPhoto}
+           disabled={pending}
+           aria-hidden="true"
+         />
        </div>
        {preview && <img src={preview} alt="Selected photo preview" className="max-h-72 w-full rounded-xl bg-[var(--surface-muted)] object-contain" />}
     </>}
