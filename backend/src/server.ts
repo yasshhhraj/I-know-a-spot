@@ -20,8 +20,9 @@ async function main(): Promise<void> {
   process.once('SIGTERM', shutdown);
 }
 
-void main().catch(() => {
+void main().catch((err: unknown) => {
   // Do not print configuration values, request contents, or provider credentials.
-  console.error('Backend failed to start (check configuration and port availability).');
+  const reason = err instanceof Error ? `: ${err.message}` : '';
+  console.error(`Backend failed to start (check configuration and port availability)${reason}.`);
   process.exitCode = 1;
 });
