@@ -1,6 +1,4 @@
 import { Component, lazy, Suspense, useCallback, useEffect, useState, type FormEvent, type ReactNode } from 'react'
-import { App as CapApp } from '@capacitor/app'
-import { Capacitor } from '@capacitor/core'
 import { apiBaseUrl, hasApiConfig } from './config'
 import { getSupabaseClient } from './supabase'
 import { fetchMe } from './api'
@@ -8,6 +6,8 @@ import { AuthController, type AuthView } from './authController'
 import { BrandMark } from './BrandMark'
 import { SignOutIcon } from './Icons'
 import { GlobeIcon, UsersIcon } from './Icons'
+import { Capacitor } from '@capacitor/core'
+import { App as CapApp } from '@capacitor/app';
 
 const SpotWorkspace = lazy(() => import('./SpotWorkspace').then(module => ({ default: module.SpotWorkspace })))
 
@@ -35,6 +35,30 @@ export default function App() {
   const [feed, setFeed] = useState<'connections' | 'public'>('connections')
   const recheck = useCallback(() => controller?.recheckAccess(), [controller])
 
+
+  useEffect(() => {
+  // Listen for deep link events when returning from Chrome
+  const listener = CapApp.addListener('appUrlOpen', async (data) => {
+    // data.url will be: com.ikas.app://auth-callback#access_token=...&refresh_token=...
+    if (data.url.includes('auth-callback')) {
+      // If Supabase returns tokens in the URL fragment (#)
+      if (data.url.includes('#')) {
+        const hashParams = new URLSearchParams(data.url.split('#')[1]);
+        const access_token = hashParams.get('access_token');
+        const refresh_token = hashParams.get('refresh_token');
+        if (access_token && refresh_token) {
+          // Set the session into Supabase client
+          await getSupabaseClient().auth.setSession({ access_token, refresh_token });
+        }
+      }
+    }
+  });
+  return () => {
+    listener.then(sub => sub.remove());
+  };
+}, []);
+
+
   useEffect(() => {
     if (!hasApiConfig()) {
       setConfigurationError(true)
@@ -45,28 +69,8 @@ export default function App() {
       setConfigurationError(true)
       return
     }
+    const isMobile = Capacitor.isNativePlatform();
     const auth = client.auth
-
-    let cleanupAppListener: (() => void) | undefined
-    if (Capacitor.isNativePlatform()) {
-      const listenerPromise = CapApp.addListener('appUrlOpen', async ({ url }) => {
-        if (url.startsWith('com.ikas.app://auth-callback')) {
-          const rawParams = url.split('#')[1] || url.split('?')[1]
-          if (rawParams) {
-            const params = new URLSearchParams(rawParams)
-            const access_token = params.get('access_token')
-            const refresh_token = params.get('refresh_token')
-            if (access_token && refresh_token) {
-              await client.auth.setSession({ access_token, refresh_token })
-            }
-          }
-        }
-      })
-      cleanupAppListener = () => {
-        listenerPromise.then(handle => handle.remove()).catch(() => {})
-      }
-    }
-
     const gate = new AuthController({
       getSession: async () => {
         const { data, error } = await auth.getSession()
@@ -81,12 +85,14 @@ export default function App() {
         return { session: data.session, error }
       },
       signInWithGoogle: async () => {
-        const redirectTo = Capacitor.isNativePlatform()
-          ? 'com.ikas.app://auth-callback'
-          : `${window.location.origin}${window.location.pathname}`
+        // Return to the origin the user is currently using (localhost, a tunnel,
+        // or the deployed site). Each origin still must be allowlisted in Supabase.
+        const redirectUrl = isMobile
+    ? 'com.ikas.app://auth-callback'
+    : window.location.origin;
         const { error } = await auth.signInWithOAuth({
           provider: 'google',
-          options: { redirectTo },
+          options: { redirectTo: redirectUrl, skipBrowserRedirect: false},
         })
         return { error }
       },
@@ -97,10 +103,7 @@ export default function App() {
     }, (token, userId, signal) => fetchMe(apiBaseUrl, token, userId, signal), setView)
     gate.start()
     setController(gate)
-    return () => {
-      cleanupAppListener?.()
-      gate.dispose()
-    }
+    return () => gate.dispose()
   }, [])
 
   async function submit(event: FormEvent<HTMLFormElement>) {
